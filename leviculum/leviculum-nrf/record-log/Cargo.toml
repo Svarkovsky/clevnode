@@ -1,0 +1,18 @@
+[package]
+name = "leviculum-record-log"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Forward-only record log on 4 KB NOR sectors, host-testable over a simulated part"
+
+[features]
+default = []
+# The simulated NOR part. On by default for `cargo test` (the `test` cfg
+# pulls it in unconditionally); a downstream integration test that wants
+# the same device enables the feature explicitly. The firmware never
+# does, so the simulation and its `alloc` use stay out of the image.
+sim = []
+
+[dependencies]
+embedded-storage = "0.3"

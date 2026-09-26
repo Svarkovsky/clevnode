@@ -1,0 +1,7 @@
+// correct: `canary_subject` (canary_target.rs:3)
+// drifted: `canary_subject` (canary_target.rs:50)
+// missing: `canary_gone` (canary_absent_file.rs:1)
+// absent submodule: `Transport.jump` (reference/Reticulum/RNS/Transport.py:1)
+// correct, comma spelling: (`canary_subject`, canary_target.rs:3)
+// drifted, comma spelling: (`canary_subject`, canary_target.rs:50)
+// not an identifier: (`canary_target.rs:3`, canary_target.rs:50)

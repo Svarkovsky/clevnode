@@ -1,0 +1,84 @@
+# Baseline for scripts/check-commit-trailers.sh (Codeberg #205).
+#
+# `baseline` is the commit the guard landed on top of. Everything after it is
+# checked; the commit itself and its ancestors are not, because 16 of them
+# carry a machine-authorship trailer from before the rule had anything behind
+# it, and rewriting published history to remove them is the larger harm.
+#
+# `legacy` is how many of those there are. The guard recomputes it on every
+# run and fails if it disagrees. That is the point: a baseline nobody counts
+# behind is an off switch, and bumping it forward to silence a fresh failure
+# would either carry a new violation below the line or drop an old one above
+# it. Either way this number moves and a reviewer sees it. The concept page
+# makes the same objection to expiry dates -- a bound a one-line diff can
+# bump is not a bound.
+#
+# `foreign` is that same argument applied to the author exemption. A machine
+# trailer is a violation on our commits and not on anyone else's -- we do not
+# edit, and do not refuse, a message somebody outside the project wrote
+# (policy 2026-06-13, which the commit-msg hook has keyed on since, and which
+# the guard did not know about until 2026-08-07). So commits above the
+# baseline whose author is not lp@lew-palm.de keep their trailers, and this
+# counts them. Uncounted, the exemption is an off switch anyone can reach by
+# setting an author e-mail; counted, a new one forces a diff and a human
+# look, which is what we wanted all along -- we still want to know when it
+# happens, we just do not want to rewrite the message.
+#
+# The 7 foreign commits above the baseline:
+#   57f7c59 2026-08-07 Eric Moore <mooreericnyc@gmail.com>
+#           feat(lxmf): expose the propagation-node HOST direction
+#           (leviculum#38), merged as PR #201; carries
+#           `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@…>`
+#   f97be0a 2026-08-15 Eric Moore <mooreericnyc@gmail.com>
+#           fix(channel): cap the channel MDU at the envelope u16 wire
+#           ceiling, merged as PR #242; carries the same trailer,
+#           cherry-picked from the CIRIS tree
+#   9cd52cd 2026-08-15 Eric Moore <mooreericnyc@gmail.com>
+#           perf(driver): announce verify + single-dest decrypt off the
+#           node lock, merged as PR #243; carries a Claude Fable 5
+#           trailer, cherry-picked from the CIRIS tree
+#   c12d575, 8bed580, 3d3d74f 2026-08-15 Eric Moore
+#           <mooreericnyc@gmail.com>: completion futures, bounded
+#           event tap, stale-sweep fix, merged as PR #253; each
+#           carries a machine trailer, cherry-picked from CIRIS
+#   61edbbd 2026-08-16 Eric Moore <mooreericnyc@gmail.com>
+#           fix(test): self-spawn the pipe-bridge child, merged as
+#           PR #259; carries a Claude Fable 5 trailer
+#
+# The 16, newest first, all on master:
+#   5c79cc9 2026-07-31 feat(link): per-link delivery telemetry
+#   b2a42a3 2026-07-31 test(local): platform-correct error kind
+#   5c7a3ba 2026-07-31 test(interfaces): de-flake two now_ms() tests
+#   ec99b18 2026-07-31 perf(driver): build resource sends off the node lock
+#   562f9c8 2026-07-21 fix(driver): emit FramesDropped
+#   f3eb1ea 2026-07-21 feat(driver): alias-resolving link accessors
+#   b087f0b 2026-07-21 test(interfaces): portable platform-sensitive tests
+#   5a7b552 2026-07-21 test(node): reproduce reverse-path contention
+#   0ef5eab 2026-07-13 fix(packet): packed_size() over-counted by 3 bytes
+#   c32a333 2026-07-03 feat(reticulum-std): AnnounceControl
+#   0b6d379 2026-06-13 fix(interfaces): deterministic airtime-credit test
+#   08a7e39 2026-06-13 fix(reticulum-std): node-owned runtime (#70)
+#   31811d2 2026-06-13 fix(rpc): gate abstract-socket mute-peer test to Linux
+#   bc29cf7 2026-06-13 feat(reticulum-std): cross-platform IPC/RPC
+#   a128b00 2026-06-13 feat(core): make tracing optional (thumbv6m)
+#   3eec55e 2026-06-13 feat(rpc): speak umsgpack as well as pickle
+
+baseline 8d309ab69a2d451b54f61dc003fb0d509bb12524
+legacy 16
+foreign 7
+
+# Every `ours` line is an identity this guard stops exempting -- i.e. one
+# whose commit messages it checks. `lp@lew-palm.de` is what Lew, the
+# reviewer and the coder use at a terminal; the second is what Codeberg
+# stamps on a web-UI edit, and three commits in this history carry it
+# (d574850, 7a76d7f, 6f366ca, all `Lew_Palm`). Both are ours, and a guard
+# that knew only the first would hand the foreign exemption to the project
+# lead's own commits without saying so.
+#
+# Who is inside the project is a declaration, not something the script can
+# derive, so there is no computed control on this list -- the control is
+# that it lives here, next to the counts, where adding a line is a diff a
+# reviewer reads. Adding one is the single cheapest way to switch this
+# guard off for somebody, so it should be as loud as moving `foreign`.
+ours lp@lew-palm.de
+ours lew_palm@noreply.codeberg.org

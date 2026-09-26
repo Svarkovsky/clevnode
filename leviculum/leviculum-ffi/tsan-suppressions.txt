@@ -1,0 +1,14 @@
+# ThreadSanitizer suppressions for the C API integration suite.
+#
+# Scope is deliberately narrow: only tokio's I/O reactor. tokio's ScheduledIo
+# keeps a lock-free waker list whose readiness is synchronised through atomics
+# and an intrusive linked list that TSan's happens-before model cannot follow,
+# so it reports races inside the reactor that are not real. These surface on
+# any path that registers an fd with the runtime, including the shared-instance
+# local socket. They are a known tokio/TSan interaction, not a defect in the
+# FFI boundary.
+#
+# The pattern matches only frames passing through tokio's scheduled_io, so a
+# real race in our own code (the eventfd bridge, handle lifecycle, the two
+# runtimes) is still reported and still fails the gate.
+race:tokio::runtime::io::scheduled_io

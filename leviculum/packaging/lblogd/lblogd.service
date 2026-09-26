@@ -1,0 +1,53 @@
+[Unit]
+Description=Leviculum Dev-Blog Server (NomadNet page node + clearnet web)
+Documentation=https://codeberg.org/Lew_Palm/leviculum
+After=network.target lnsd.service
+Wants=network.target
+
+# Deliberately After= without Requires=: lblogd needs *a* Reticulum shared
+# instance, and lnsd is only one way to have one — the Python rnsd serves
+# just as well, and the leviculum package is a Recommends, not a Depends.
+# Ordering when lnsd is present, no hard coupling when it is not. If the
+# daemon is not up yet, lblogd exits and Restart= below brings it back.
+
+[Service]
+Type=simple
+User=lblogd
+Group=lblogd
+ExecStart=/usr/bin/lblogd --config /etc/lblogd/config.toml
+ExecReload=/bin/kill -HUP $MAINPID
+
+# lblogd resolves its shared-instance connection during startup and exits
+# if no daemon answers. On a fresh boot it can therefore lose the race
+# against lnsd. Restarting until the daemon is up is the intended
+# behaviour, not an error path.
+Restart=on-failure
+RestartSec=10
+
+# The shipped config listens on 127.0.0.1:8080, which needs no privilege.
+# The capability is granted anyway because the *documented production*
+# config uses the defaults 0.0.0.0:80 and 0.0.0.0:443, and an operator who
+# edits the config should not additionally have to discover that the unit
+# needs editing too. Ambient capabilities are granted by systemd directly,
+# so this composes with NoNewPrivileges below.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+# Hardening, mirroring lnsd.service. The data directory holds the node
+# identity and the ACME certificate cache and is the only writable path.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lblogd
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,63 @@
+# cargo-about configuration for the firmware half of THIRD-PARTY-NOTICES
+# (Codeberg #288).
+#
+# leviculum-nrf is its own workspace with its own Cargo.lock, so its
+# dependency graph cannot be reached from the root about.toml — hence a
+# second config rather than a second section of the first.
+#
+# scripts/gen-notices.sh runs this against the `t114` binary's feature
+# set, because that is the image the lnflash bundle ships. The bundle
+# carries the resulting notices next to the UF2.
+
+# The one target the firmware is built for
+# (leviculum-nrf/.cargo/config.toml).
+targets = ["thumbv7em-none-eabihf"]
+
+ignore-dev-dependencies = true
+ignore-build-dependencies = false
+
+# Same order and same reasoning as the root about.toml. The firmware
+# graph is smaller and the licence spread is narrower, but the list is
+# kept identical so a crate moving between the two graphs does not need
+# a config edit as well.
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "AGPL-3.0-or-later",
+    "BSD-3-Clause",
+    "BSD-2-Clause",
+    "ISC",
+    "Zlib",
+    "MPL-2.0",
+    "BSL-1.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "Unlicense",
+    # Nordic's five-clause licence on the SoftDevice header bindings —
+    # see the clarification below. Not an SPDX-listed licence, so it
+    # travels under a LicenseRef id.
+    "LicenseRef-Nordic-5-Clause",
+]
+
+workarounds = []
+
+# nrf-softdevice-s140 declares `license-file = "LICENSE-NORDIC"` and no
+# `license` field, so cargo-about cannot synthesise an SPDX expression
+# and drops it from the output with a warning — the exact silent gap
+# this whole file exists to close. The crate is the generated binding
+# layer over Nordic's SoftDevice headers and is COMPILED INTO the t114
+# image, so its clause 1 and 2 (reproduce the copyright notice and the
+# conditions in binary redistributions) bind our UF2.
+#
+# Distinct from the SoftDevice blob itself: that one travels as a
+# separate .hex with its own licence agreement beside it in the lnflash
+# bundle (scripts/lnflash-bundle.sh) and is never linked in. This entry
+# is about the bindings, which are.
+[nrf-softdevice-s140.clarify]
+license = "LicenseRef-Nordic-5-Clause"
+
+[[nrf-softdevice-s140.clarify.files]]
+path = "LICENSE-NORDIC"
+license = "LicenseRef-Nordic-5-Clause"
+checksum = "3f8a5738383719bbcd5975da82923797d707daa9507245d8c820e2b1df55c5c5"

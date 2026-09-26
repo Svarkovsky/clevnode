@@ -1,0 +1,133 @@
+[package]
+name = "leviculum-std"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Standard library extensions for reticulum - networking, file I/O, async runtime"
+
+# `--cfg fuzzing` is set by cargo-fuzz for the detached `fuzz/` harness; declare
+# it so the unexpected-cfgs lint stays quiet in normal (non-fuzz) builds.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
+
+
+
+
+# INTERNAL. Enables the `cf_*` test targets, which exist to NOT compile: they
+# are the enforcement of the two prohibitions the core-lock budget places on
+# anything the event loop calls (Codeberg #196). Never enable it in a build you
+# want to succeed; `scripts/check-processor-compile-fail.sh` turns it on,
+# asserts the build fails, and pins the error code each fixture must produce.
+
+
+[dependencies]
+leviculum-core = { path = "../leviculum-core", default-features = true }
+# `file_lxmf_store` persists an LXMF router's state, so the LXMF storage trait
+# is part of this crate's API. The dependency is one-way: leviculum-lxmf is
+# no_std and knows nothing about this crate.
+leviculum-lxmf = { path = "../leviculum-lxmf" }
+rand_core = { version = "0.6", features = ["std", "getrandom"] }
+
+futures.workspace = true
+tokio.workspace = true
+if-addrs.workspace = true
+socket2.workspace = true
+libc.workspace = true
+# tokio-serial.workspace = true
+tracing = { workspace = true, features = ["std"] }
+# Used by `test_support::tracing_setup` (and from commit 2 onward
+# `test_support::event_log`) for the test-harness subscriber.  The
+# crate's runtime presence is a few KB; production builds that don't
+# call into `test_support` see only compile-time pull-in via the
+# Layer trait used by the Registry composition.
+tracing-subscriber.workspace = true
+# Used by the `jl` and `jldiff` binaries (Stage 7 / Codeberg #39 piece 4).
+# Same major version as leviculum-cli's clap; no workspace alias to keep
+# the per-crate Cargo.toml self-contained.
+clap = { version = "4", features = ["derive"], optional = true }
+serde.workspace = true
+serde-pickle = { workspace = true, optional = true }
+# The shared-instance RPC client (`rpc::rpc_query`) decodes pickle
+# responses into `serde_json::Value` so callers (e.g. `lnstest diag`) don't
+# need a pickle dependency themselves.
+serde_json = "1"
+sha2 = { workspace = true, features = ["std"] }
+hmac.workspace = true
+md-5.workspace = true
+rmp-serde.workspace = true
+rmpv.workspace = true
+toml = { workspace = true, optional = true }
+thiserror.workspace = true
+
+# The pure BLE advertisement/decision logic shared with the firmware:
+# `parse_peer_advertisement`, `should_initiate`, the v0.3.0 capability
+# record and the LN-<hex8> name derivation. One implementation on both
+# sides of the rig, per the reuse rule in the #255 seam report.
+leviculum-ble-tx = { path = "../leviculum-nrf/ble-tx" }
+# The announce cadence and per-peer rate limit both stacks obey (#376):
+# host-tested once, next to the firmware that shares it, so the policy the
+# desk measures on a board is the policy the daemon runs.
+leviculum-announce-policy = { path = "../leviculum-nrf/announce-policy" }
+# ble-tx's drain slots are `embassy-sync` Signals, so linking it needs a
+# `critical_section::Impl`. ble-tx supplies one only as a dev-dependency —
+# correct there, because the firmware gets the real one from nrf-softdevice
+# and two impls are a link error. leviculum-std is host-only and is the
+# crate that pulled ble-tx into host binaries, so the host impl is its
+# obligation: without it a single-package build (`cargo build -p
+# leviculum-ffi`, i.e. `just build-ffi`) produces a libleviculum.a with
+# `_critical_section_1_0_acquire/release` undefined, and every static
+# consumer fails to link. `cargo test --workspace` hid this because
+# leviculum-core's dev-dependency on `critical-section/std` unifies into
+# that build. Never reaches the firmware: leviculum-nrf does not depend on
+# leviculum-std.
+critical-section = { version = "1", features = ["std"] }
+
+# md-5 is imported as `use md5::Md5`; cargo-machete flags the hyphenated
+# package name as unused because grepping the sources finds `md5::` but
+# not `md_5::`. `dbus` is a feature-unification-only edge, see above;
+# `critical-section` is a link-time impl provider with no `use` site.
+[package.metadata.cargo-machete]
+ignored = ["md-5", "dbus", "critical-section"]
+
+[dev-dependencies]
+# `test-util` enables `#[tokio::test(start_paused = true)]`: the duty-lock
+# flow-control tests drive multi-second gate thresholds on virtual time
+# instead of sleeping through them.
+tokio = { workspace = true, features = ["test-util"] }
+tracing-subscriber.workspace = true
+hex = "0.4"
+regex = "1"
+tempfile = "3"
+# lnomad is the NomadNet browser backend; its shared-instance fetch path is
+# drop-in tested here against both lnsd and rnsd. This is a dev-only cycle
+# (lnomad depends on leviculum-std at build time), which Cargo permits.
+lnomad = { path = "../lnomad" }
+
+# The Columba BLE interface (`interfaces::ble`) is LINUX-ONLY: bluer talks to
+# BlueZ over D-Bus, and libdbus-sys has no macOS or Windows build. Declared as
+# an unconditional dependency it broke both hosts outright — and this crate is
+# what CIRISEdge links into its darwin and win_amd64 wheels, so the breakage
+# reached a consumer, not just a CI lane. The direct `dbus` dependency exists
+# only to switch on its `vendored` feature (build libdbus from source) so the
+# musl-static default target links self-contained; feature unification applies
+# it to bluer's own dbus edge.
+[target.'cfg(target_os = "linux")'.dependencies]
+# bluer.workspace = true
+# dbus.workspace = true
+
+[features]
+default = ["compression"]
+compression = ["leviculum-core/compression"]
+cli = ["dep:clap"]
+rpc = ["dep:serde-pickle"]
+toml-config = ["dep:toml"]
+__compile_fail_fixtures = []
+
+[[bin]]
+name = "jl"
+required-features = ["cli"]
+
+[[bin]]
+name = "jldiff"
+required-features = ["cli"]

@@ -1,0 +1,246 @@
+# Nightly build pipeline for leviculum.
+#
+# Builds two musl-static .deb packages (amd64 + arm64) and uploads
+# them to a rolling `nightly` release on Codeberg. Assets are
+# overwritten each run, so these download URLs stay stable:
+#
+#   https://codeberg.org/Lew_Palm/leviculum/releases/download/nightly/leviculum-nightly-amd64.deb
+#   https://codeberg.org/Lew_Palm/leviculum/releases/download/nightly/leviculum-nightly-arm64.deb
+#
+# The lnomad terminal browser ships as its own .deb + tarball (it must
+# not pull in the auto-started lnsd service that the leviculum package
+# sets up):
+#
+#   https://codeberg.org/Lew_Palm/leviculum/releases/download/nightly/lnomad-nightly-amd64.deb
+#   https://codeberg.org/Lew_Palm/leviculum/releases/download/nightly/lnomad-nightly-arm64.deb
+#
+# So does the lblogd dev-blog server, which installs a systemd service of
+# its own:
+#
+#   https://codeberg.org/Lew_Palm/leviculum/releases/download/nightly/lblogd-nightly-amd64.deb
+#   https://codeberg.org/Lew_Palm/leviculum/releases/download/nightly/lblogd-nightly-arm64.deb
+#
+# lnomad and lblogd carry their own version numbers, independent of the
+# leviculum stack's; scripts/deb-stamp.sh derives one Debian version per
+# package.
+#
+# The lnflash firmware bundle is not a package at all — it is the
+# stranger-unpacks-it tarball (one binary, the t114 UF2, Nordic's S140
+# SoftDevice and its licence), so it ships as a tarball only:
+#
+#   https://codeberg.org/Lew_Palm/leviculum/releases/download/nightly/lnflash-nightly-amd64.tar.gz
+#
+# amd64 only: the firmware and the SoftDevice in it are architecture-
+# independent, but the host binary is not, and the bundle's own
+# --check-bundle gate cannot run an aarch64 binary on the amd64 runner.
+#
+# ONE-TIME SETUP — configure a cron schedule in the Woodpecker web UI
+# (Repo → Settings → Crons). YAML cannot declare the cron itself; this
+# file only reacts to the `event: cron` trigger it produces. Suggested
+# schedule: `0 2 * * *` (02:00 UTC daily).
+#
+# Authentication for the publish step uses a Codeberg API token
+# (write:repository scope) supplied via the Woodpecker secret
+# `codeberg_token`. NETRC is only visible inside the clone step,
+# not in user-defined steps, so a manual token is required.
+
+# Two triggers. The nightly cron is what publishes; the push trigger is
+# a guard, and only builds. Packaging changes were previously unbuildable
+# before merge — `when: event: cron` alone meant a broken manifest first
+# showed up in the following night's run, and then only to whoever
+# thought to look at the releases page. That is exactly how commit
+# 4c580cc5 stalled the release for eight days. The paths listed here are
+# the inputs to the .deb build and nothing else, so ordinary commits do
+# not pay for a packaging build.
+when:
+  - event: cron
+  - event: push
+    path:
+      include:
+        - '.woodpecker/**'
+        - 'scripts/build-deb.sh'
+        - 'scripts/deb-stamp.sh'
+        - 'scripts/deb-finalize.sh'
+        - 'scripts/collect-nightly-debs.sh'
+        - 'scripts/md2man.py'
+        - 'docs/src/man/**'
+        - 'packaging/**'
+        - 'leviculum-cli/Cargo.toml'
+        - 'lnomad/Cargo.toml'
+        - 'lblogd/Cargo.toml'
+        # Codeberg #288: every .deb, every userspace tarball and the
+        # lnflash bundle install this file. It is generated (see
+        # scripts/gen-notices.py) but tracked, so from this pipeline's
+        # point of view it is an ordinary packaging input, and a commit
+        # that changes it should prove the packages still build.
+        - 'THIRD-PARTY-NOTICES'
+        # lnflash bundle inputs. lnflash/** in full rather than just its
+        # Cargo.toml, because the crate carries payload/ — the SoftDevice
+        # blob, its licence file and the bundle README all end up inside
+        # the tarball, and lnflash's own --check-bundle is the gate the
+        # bundle script runs before packing. A missing licence file is a
+        # packaging break, not a code change.
+        #
+        # From leviculum-nrf only the files that decide whether the
+        # firmware can be built and converted at all: the linker script,
+        # the build script, the dependency set and the UF2 writer. Not
+        # src/** — firmware source churn is ordinary commit traffic here,
+        # and making every one of those commits pay for a full .deb
+        # pipeline is exactly what the paragraph above is avoiding. A
+        # firmware compile break still turns the next nightly red.
+        - 'scripts/lnflash-bundle.sh'
+        - 'lnflash/**'
+        - 'leviculum-nrf/Cargo.toml'
+        - 'leviculum-nrf/Cargo.lock'
+        - 'leviculum-nrf/build.rs'
+        - 'leviculum-nrf/memory.x'
+        - 'leviculum-nrf/tools/bin2uf2.rs'
+
+# Skip submodule init: reference/ holds the Python reference Reticulum
+# implementation and two firmware reference repos, none of which the
+# .deb build touches. Saves bandwidth + clone time on every step.
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      recursive: false
+      submodules: false
+
+steps:
+  # Codeberg #266: this pipeline published .debs to strangers without ever
+  # running a test. It is first because that is the whole point — steps run
+  # serially in file order, and a non-zero exit here terminates the workflow,
+  # so build, package and publish are never reached with a red commit. The two
+  # cron-only steps below do NOT escape that: their `when:` sets no `status:`,
+  # and the default is success-only (Woodpecker 3.17 workflow syntax, the
+  # version ci.codeberg.org runs: "By default, steps only run when the workflow
+  # has succeeded up to that point, which is equivalent to status: [success]").
+  #
+  # The gate itself is `just ci-gate`, defined in the Justfile — see the note
+  # in build-amd64 below on why the commands are not spelled out here. What is
+  # left in this step is provisioning, every line of it forced rather than
+  # chosen:
+  #   musl-tools — .cargo/config.toml builds everything for
+  #     x86_64-unknown-linux-musl, and ring's build script (rustls, via the
+  #     lblogd/lnomad dependency graph) needs a musl C compiler. Without it the
+  #     gate dies in cc-rs long before it lints anything.
+  #   rustfmt + clippy — rust:bookworm ships neither component.
+  #   just — not packaged in Debian bookworm; `cargo install` is how this file
+  #     already gets cargo-deb and flip-link. ~45 s.
+  #   reference/Reticulum — the clone above skips submodules, but lnomad's
+  #     renderer tests include_str! its README.mu (lnomad/src/render.rs:1496),
+  #     so without it lnomad's lib tests do not compile and the crate this
+  #     pipeline publishes contributes zero tests to its own gate. --depth 1,
+  #     one submodule of four, ~5 s.
+  gate:
+    image: rust:bookworm
+    commands:
+      - apt-get update && apt-get install -y musl-tools
+      - rustup component add rustfmt clippy
+      - cargo install --locked just
+      - git submodule update --init --depth 1 reference/Reticulum
+      - just ci-gate
+
+  build-amd64:
+    image: rust:bookworm
+    commands:
+      # python3: scripts/build-deb.sh renders the manual pages the .deb
+      # manifests install from. It is stdlib-only by design, so the
+      # interpreter is the whole dependency.
+      - apt-get update && apt-get install -y musl-tools python3
+      - cargo install --locked cargo-deb
+      - rustup target add x86_64-unknown-linux-musl
+      # Pin the build ID + per-package DEB versions once and persist
+      # them, so all subsequent steps see exactly the same values (no
+      # midnight-UTC drift between build-amd64 and build-arm64). The
+      # logic lives in a script shared with the Justfile's build-deb*
+      # recipes; it takes the commit from CI_COMMIT_SHA when set and
+      # from git otherwise. Keeping it out of this file also keeps it
+      # clear of Woodpecker's pre-substitutor, which rewrites
+      # brace-style references in the raw YAML before any shell sees
+      # them and expands unknown names to empty without warning.
+      - bash scripts/deb-stamp.sh
+      # Everything from here to the finished .debs — manual pages, clean,
+      # build, cargo deb, deb-finalize — is one script, shared with the
+      # Justfile's build-deb-amd64. Spelling the steps out here a second
+      # time is what broke the nightly for eight days.
+      - bash scripts/build-deb.sh amd64
+
+  build-arm64:
+    image: rust:bookworm
+    commands:
+      # cargo-zigbuild uses Zig as the C compiler/linker — the only way
+      # to cross-compile to aarch64-musl from an amd64 rust:bookworm
+      # image without docker-in-docker or a dedicated arm64 runner.
+      - apt-get update && apt-get install -y python3 python3-pip python3-venv xz-utils curl
+      - python3 -m venv /opt/zigvenv && /opt/zigvenv/bin/pip install cargo-zigbuild ziglang
+      - export PATH="/opt/zigvenv/bin:$PATH"
+      - cargo install --locked cargo-deb
+      - rustup target add aarch64-unknown-linux-musl
+      # No re-stamp here: build-amd64 already wrote .build-id and the
+      # .deb-version-* files, and this step must reuse them verbatim so
+      # the two architectures ship identical version strings. The script
+      # reads them rather than deriving versions of its own, which is
+      # what makes reusing them the default instead of a discipline.
+      - bash scripts/build-deb.sh arm64
+
+  build-lnflash:
+    image: rust:bookworm
+    commands:
+      # The firmware toolchain, derived from what scripts/lnflash-bundle.sh
+      # actually invokes:
+      #   flip-link            — leviculum-nrf/.cargo/config.toml names it as
+      #                          the linker for thumbv7em-none-eabihf; without
+      #                          it the firmware build fails at link.
+      #   thumbv7em-none-eabihf — the firmware target itself.
+      #   llvm-tools           — supplies llvm-objcopy, which the script finds
+      #                          under the rustc sysroot to flatten the ELF
+      #                          before bin2uf2. (arm-none-eabi-binutils would
+      #                          do, but it is a ~150 MB apt pull for one tool
+      #                          rustup already ships.)
+      #   x86_64-unknown-linux-musl — the host binary in the bundle, per the
+      #                          workspace-wide musl default. rust-lld links
+      #                          it, so no musl-tools here.
+      # No C toolchain: the t114 feature set pulls no bindgen/cc build
+      # scripts. git is already in the image and is needed both for the
+      # nrf-softdevice git dependency and for the git_sha the manifest
+      # records.
+      - rustup target add thumbv7em-none-eabihf x86_64-unknown-linux-musl
+      - rustup component add llvm-tools
+      - cargo install --locked flip-link
+      # No SKIP_FIRMWARE: a published bundle must carry a firmware image
+      # built from the commit it claims, and the vendored Nordic S140
+      # blob it ships beside it. The script ends by running the bundle's
+      # own --check-bundle, so a mismatched checksum fails the step here
+      # rather than on somebody's board.
+      - bash scripts/lnflash-bundle.sh
+
+  # Staging and publishing are cron-only. A push build exists to prove
+  # the packages still build; letting it reach these two steps would let
+  # any packaging commit replace the rolling release with a mid-day
+  # build of whatever was just pushed.
+  package:
+    image: debian:bookworm-slim
+    when:
+      event: cron
+    commands:
+      # git for the source tarball (`git archive HEAD`); coreutils for
+      # sha256sum is already in the slim image.
+      - apt-get update && apt-get install -y git
+      - export LEVICULUM_BUILD_ID="$(cat .build-id)"
+      - bash scripts/collect-nightly-debs.sh
+
+  publish:
+    image: debian:bookworm-slim
+    when:
+      event: cron
+    environment:
+      CODEBERG_TOKEN:
+        from_secret: codeberg_token
+    commands:
+      # git: publish-nightly.sh force-pushes the `nightly` tag to the
+      # built commit at the end — the API refresh path never moves the
+      # git ref, only release creation does.
+      - apt-get update && apt-get install -y curl jq git
+      - export LEVICULUM_BUILD_ID="$(cat .build-id)"
+      - bash scripts/publish-nightly.sh

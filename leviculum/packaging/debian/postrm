@@ -1,0 +1,31 @@
+#!/bin/sh
+# postrm for leviculum — on purge, remove state/socket files and the
+# system user/group. `config` under /etc/reticulum is a conffile and
+# handled by dpkg's conffile machinery.
+
+set -e
+
+case "$1" in
+    purge)
+        rm -rf /etc/reticulum/storage /etc/reticulum/identities
+        # Clean up an empty /etc/reticulum if dpkg has already removed
+        # the conffile.
+        if [ -d /etc/reticulum ]; then
+            rmdir --ignore-fail-on-non-empty /etc/reticulum
+        fi
+
+        if getent passwd leviculum >/dev/null; then
+            deluser --quiet --system leviculum >/dev/null 2>&1 || true
+        fi
+        if getent group leviculum >/dev/null; then
+            delgroup --quiet --system leviculum >/dev/null 2>&1 || true
+        fi
+        ;;
+
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

@@ -1,0 +1,68 @@
+# Build artifacts
+/target/
+/dist/
+*.deb
+# Version stamp files written by scripts/deb-stamp.sh (build-deb* just
+# recipes and CI nightly). One build id per run, one Debian version per
+# package, since the packages are versioned independently.
+/.build-id
+/.deb-version
+/.deb-version-*
+leviculum-nrf/target/
+# leviculum-nrf/Cargo.lock is deliberately NOT ignored (Codeberg #288):
+# the firmware workspace is a binary artifact like the root workspace, so
+# its lock is tracked. While it was ignored every machine resolved the
+# dependency graph privately, which made both the shipped UF2 content and
+# THIRD-PARTY-NOTICES depend on who happened to build them.
+**/*.rs.bk
+
+# RNode firmware images extracted by `just flash-rnode-extract` (Mark's
+# signed binaries; pulled from a local device, not committed).
+/.rnode-fw/
+# Repo-local venv with a working esptool (just flash-rnode-setup).
+/.rnode-tools/
+
+# Generated headers (cbindgen). The `*-ffi` glob also catches stray
+# old-name artifacts (e.g. a leftover reticulum-ffi/) so they cannot be
+# committed by an over-broad `git add`.
+*-ffi/*.h
+
+# Markdown files
+IMPLEMENTATION_PLAN.md
+# CLAUDE.md plus its offspring: an editor swap file (CLAUDE.md~), a merge
+# leftover (CLAUDE.md.orig) or an ad-hoc copy (CLAUDE.md.bak-mirror) holds
+# the same policy text as the original, so the rule covers the whole family
+# instead of the one spelling somebody thought of first.
+CLAUDE.md*
+HOWTO.md
+
+# Generated docs (mdbook output)
+docs/book/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing artifacts
+*.log
+*.tmp
+
+# Coverage reports
+/coverage/
+*.profraw
+*.profdata
+__pycache__/
+
+# Local deploy scripts
+scripts/deploy-*.fish
+
+# Claude Code local state (never leaves this machine — see pre-push guard)
+.claude/
+

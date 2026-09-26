@@ -1,0 +1,10 @@
+# musl-static binaries; see packaging/lintian/lblogd for the reasoning
+# behind both overrides.
+leviculum: unstripped-binary-or-object [usr/bin/lncp]
+leviculum: unstripped-binary-or-object [usr/bin/lnsd]
+leviculum: unstripped-binary-or-object [usr/bin/lnstatus]
+leviculum: unstripped-binary-or-object [usr/bin/lnstest]
+leviculum: shared-library-lacks-prerequisites [usr/bin/lncp]
+leviculum: shared-library-lacks-prerequisites [usr/bin/lnsd]
+leviculum: shared-library-lacks-prerequisites [usr/bin/lnstatus]
+leviculum: shared-library-lacks-prerequisites [usr/bin/lnstest]

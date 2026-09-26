@@ -1,0 +1,117 @@
+#!/bin/sh
+# postinst for leviculum — provisions the service user, group, and the
+# /etc/reticulum directory layout. Idempotent; safe to re-run on
+# upgrade (case=configure with a $2 previous version).
+
+set -e
+
+case "$1" in
+    configure)
+        # System group for socket access (clients join this group).
+        if ! getent group leviculum >/dev/null; then
+            addgroup --quiet --system leviculum
+        fi
+
+        # System user owning the daemon and its state.
+        if ! getent passwd leviculum >/dev/null; then
+            adduser --quiet --system \
+                --ingroup leviculum \
+                --home /etc/reticulum --no-create-home \
+                --gecos "Leviculum Reticulum daemon" \
+                --shell /usr/sbin/nologin \
+                leviculum
+        fi
+
+        # LoRa RNode/T114 USB devices typically belong to `dialout`.
+        if getent group dialout >/dev/null; then
+            adduser --quiet leviculum dialout || true
+        fi
+
+        # /etc/reticulum is the single config + state directory shared
+        # between lnsd and any Reticulum tooling the user runs against
+        # it (lnstest, rnstatus, rncp, Sideband, Nomadnet, …). Mode 2775
+        # gives the `leviculum` group write access (so non-root members
+        # can persist Python-side state under storage/cache, identities,
+        # interfaces, …) and setgid makes new files inherit the group.
+        mkdir -p /etc/reticulum/storage
+        chown -R leviculum:leviculum /etc/reticulum
+        chmod 2775 /etc/reticulum
+        chmod 2775 /etc/reticulum/storage
+
+        # Is another Reticulum daemon already serving the instance name
+        # this package's config asks for?
+        #
+        # The instance name IS the identity of a shared instance, so two
+        # daemons under one name is a contradiction, not a topology —
+        # lnsd correctly refuses to start. The problem is that nothing
+        # asked before putting it in that position: lblogd and lnomad
+        # Recommend this package, apt installs Recommends by default, and
+        # a host already running Python rnsd therefore acquires an
+        # enabled service with nothing to do, restarting every 5 s
+        # forever. The binaries are still worth having (lncp, lnstatus and
+        # lnstest all drive the *existing* daemon), so install them and
+        # leave the redundant daemon switched off.
+        #
+        # First install only. On upgrade the operator has already made
+        # this choice, and the socket we would find might well be our own
+        # running daemon.
+        #
+        # /proc/net/unix rather than `ss`: it is always present, needs no
+        # package, and lists abstract sockets under their `@name`.
+        LEVICULUM_NAME_TAKEN=""
+        if [ -z "$2" ] && [ -r /etc/reticulum/config ] && [ -r /proc/net/unix ]; then
+            _share=$(sed -n 's/^[[:space:]]*share_instance[[:space:]]*=[[:space:]]*\([^[:space:]]*\).*/\1/p' \
+                /etc/reticulum/config | head -n1)
+            _name=$(sed -n 's/^[[:space:]]*instance_name[[:space:]]*=[[:space:]]*\([^[:space:]]*\).*/\1/p' \
+                /etc/reticulum/config | head -n1)
+            [ -n "$_name" ] || _name=default
+            # Absent means enabled, matching RNS's own default.
+            case "${_share:-yes}" in
+                [Yy]* | [Tt]* | 1)
+                    if grep -q " @rns/${_name}\$" /proc/net/unix 2>/dev/null; then
+                        LEVICULUM_NAME_TAKEN="$_name"
+                    fi
+                    ;;
+            esac
+        fi
+
+        # First-install hint only (skip on upgrade, when $2 is set).
+        if [ -z "$2" ]; then
+            echo ""
+            echo "leviculum: to use lnstest / lncp / lnstatus / rnstatus / rncp as a non-root user,"
+            echo "add the user to the 'leviculum' group, then log out and back in:"
+            echo "    sudo usermod -aG leviculum \$USER"
+            echo ""
+            echo "Python tools (rnstatus, rncp, Sideband, Nomadnet) auto-detect"
+            echo "/etc/reticulum and reach lnsd via the shared-instance socket."
+            echo ""
+        fi
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+esac
+
+#DEBHELPER#
+
+# The marker above is replaced with cargo-deb's unconditional enable and
+# start. It begins by unmasking the unit, so a mask set earlier would not
+# survive, and there is no hook to skip it — hence undoing it here rather
+# than preventing it. Shell state carries across the substitution because
+# the marker is textual: LEVICULUM_NAME_TAKEN was set in the same script.
+if [ -n "${LEVICULUM_NAME_TAKEN:-}" ]; then
+    deb-systemd-invoke stop lnsd.service >/dev/null 2>&1 || true
+    deb-systemd-helper disable lnsd.service >/dev/null 2>&1 || true
+    echo ""
+    echo "leviculum: a Reticulum daemon is already serving the shared instance"
+    echo "'${LEVICULUM_NAME_TAKEN}' on this host, so lnsd has nothing to do here and"
+    echo "has been left installed but disabled. lncp, lnstatus and lnstest work"
+    echo "against the daemon that is already running."
+    echo ""
+    echo "To run lnsd instead, stop the other daemon and then:"
+    echo "    sudo systemctl enable --now lnsd"
+    echo "To run both, give one of them a different instance_name."
+    echo ""
+fi
+
+exit 0

@@ -1,0 +1,131 @@
+[package]
+name = "lblogd"
+# Versioned independently of the leviculum stack: a blog server has its own
+# release cadence and its own compatibility surface (config file, post
+# format, page layout), none of which move when the protocol core does.
+# The workspace version stays the stack's; this one is the product's.
+version = "0.1.1"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Dev-blog server: serves Markdown posts over HTTP/HTTPS and as a NomadNet node"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+# `cargo deb -p lblogd --target x86_64-unknown-linux-musl` builds a
+# musl-static .deb. A separate package from `leviculum`, like lnomad:
+# a blog server and a network daemon have no reason to be installed or
+# upgraded together. Unlike lnomad it does install and start a systemd
+# service, since a blog server is a daemon.
+[package.metadata.deb]
+name = "lblogd"
+maintainer = "Lew Palm <lp@lew-palm.de>"
+copyright = "2025, Lew Palm"
+license-file = ["../LICENSE", "0"]
+extended-description = """\
+lblogd serves a directory of Markdown posts on two sides at once: as a
+NomadNet page node over the Reticulum mesh, and as a web server on the
+clearnet with automatic HTTPS via Let's Encrypt.
+
+Posts are plain Markdown files with an optional TOML frontmatter block.
+Adding a file and reloading the service publishes it to both sides.
+
+The package installs lblogd as a systemd service under a dedicated
+'lblogd' user. As shipped it serves on 127.0.0.1:8180 without a
+certificate; see /etc/lblogd/config.toml to put it on a public domain.
+The NomadNet side needs a running Reticulum shared instance — lnsd from
+the 'leviculum' package, or the Python rnsd.
+"""
+section = "net"
+priority = "optional"
+# The binary is musl-static, so cargo-deb's `$auto` would find no shared
+# library deps and only emit a warning. Both entries here are real:
+# adduser because postinst creates the service user, and procps because
+# the unit's ExecReload runs /bin/kill, which is a procps binary and not
+# a shell builtin. procps is Priority: important but not Essential, so a
+# minimal install can lack it — a container test caught exactly that,
+# with `systemctl reload` failing 203/EXEC. /bin/kill rather than
+# /usr/bin/kill because that path is correct both before and after the
+# usr-merge, and these packages install as far back as Debian 9.
+# leviculum is a Recommends rather than a Depends for the same reason as
+# in lnomad: the NomadNet side needs *a* Reticulum instance, and the
+# Python rnsd is equally valid.
+depends = "adduser, procps"
+recommends = "leviculum"
+assets = [
+    # cargo-deb only recognises "target/release/..." exactly as a Cargo
+    # target path and auto-substitutes the --target triple into it. Any
+    # prefix disables the rewrite and silently picks up stale non-musl
+    # builds — see leviculum-cli/Cargo.toml.
+    ["target/release/lblogd", "usr/bin/", "755"],
+    # Must NOT be named `config`: `maintainer-scripts` below points at the
+    # same directory, and cargo-deb sweeps up every file there whose name
+    # is a maintainer-script name — `config` among them, as the debconf
+    # pre-configuration script. A file named `config` therefore ships
+    # twice: correctly as this asset, and wrongly as an executable control
+    # script that dpkg-preconfigure runs as /bin/sh.
+    ["../packaging/lblogd/config.toml", "etc/lblogd/config.toml", "644"],
+    ["README.md", "usr/share/doc/lblogd/README.md", "644"],
+    # Rendered from docs/src/man/ by scripts/md2man.py, which the
+    # build-deb recipes run before this. The Markdown under docs/ is the
+    # single source: mdbook publishes it and the package installs it, so
+    # the two can never drift. cargo-deb gzips anything under
+    # usr/share/man/ by itself.
+    ["../target/man/lblogd.1", "usr/share/man/man1/lblogd.1", "644"],
+    # Documented overrides for the two lintian tags that a
+    # musl-static binary always trips; the file explains why each
+    # is a deliberate deviation rather than a defect.
+    ["../packaging/lintian/lblogd", "usr/share/lintian/overrides/lblogd", "644"],
+    # Codeberg #288; see leviculum-cli/Cargo.toml for what this file is and
+    # why a musl-static package needs it.
+    ["../THIRD-PARTY-NOTICES", "usr/share/doc/lblogd/THIRD-PARTY-NOTICES", "644"],
+]
+# Generated per build by scripts/deb-stamp.sh, because Debian wants the
+# top entry to carry this build's version and the version is stamped.
+changelog = "../target/deb-changelog/lblogd"
+maintainer-scripts = "../packaging/lblogd/"
+conf-files = ["/etc/lblogd/config.toml"]
+
+[package.metadata.deb.systemd-units]
+unit-name = "lblogd"
+unit-scripts = "../packaging/lblogd/"
+enable = true
+start = true
+restart-after-upgrade = true
+
+[dependencies]
+leviculum-core = { path = "../leviculum-core" }
+leviculum-std = { path = "../leviculum-std" }
+axum.workspace = true
+axum-server.workspace = true
+clap = { version = "4", features = ["derive"] }
+futures.workspace = true
+notify.workspace = true
+pulldown-cmark.workspace = true
+rmpv.workspace = true
+rustls-acme.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+leviculum-micron = { path = "../leviculum-micron" }
+lnomad = { path = "../lnomad" }
+hex = "0.4"
+tempfile = "3"
+# test-util is not part of tokio's "full"; the debounce tests need paused
+# time so they assert the collapsing rule without wall-clock waits.
+tokio = { workspace = true, features = ["test-util"] }
+tower.workspace = true
+
+[lib]
+name = "lblogd"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lblogd"
+path = "src/main.rs"

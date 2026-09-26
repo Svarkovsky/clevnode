@@ -1,0 +1,115 @@
+# The board catalogue: every board fact lnflash knows, and nothing about any
+# particular firmware release.
+#
+# Compiled into the binary (`manifest::Catalogue::builtin`). It is here rather
+# than in a bundle's manifest.toml because these are properties of the
+# hardware, not of a release: which USB IDs an LNode answers on does not change
+# when we cut a new firmware, and the sessions that only configure a board that
+# is already running — `--set-time`, `--set-telemetry` — need exactly this and
+# no image at all (Codeberg #342). Activation is configuration, not firmware
+# (#236/#238), so requiring a bundle on disk for it sent people hunting for
+# firmware they had no use for.
+#
+# The bundle's manifest.toml carries the other half: the version, and one
+# payload entry per board naming the image and its checksum. Splitting them
+# this way keeps one source of truth for each — a board fact is here, a release
+# fact is there, and neither is written down twice.
+#
+# The binary stays board-agnostic: an `if board == "t114"` anywhere in the
+# source would mean the split has failed. A new nRF or RP2040 board is an entry
+# in this file plus an image in the bundle; a new chip family is one new
+# transport in Rust (docs/src/concepts/lnode-flashing.md, "Four axes").
+#
+# The constants below were measured on the rig and are recorded with their
+# evidence in docs/src/concepts/lnode-flashing.md.
+
+[board.t114]
+family    = "nrf52840"
+transport = "uf2-msc"
+# Tried in order. The touch only exists if the running firmware implements it;
+# ours does, stock Meshtastic does not, so the double-tap is a real fallback.
+entry     = ["touch-1200", "double-tap"]
+
+[board.t114.identify]
+# The truth, read from INFO_UF2.TXT after entering the bootloader. Exactly
+# this string, not a substring of something longer.
+info_uf2_board_id = "HT-n5262"
+# Hints for finding candidates. Never identity: a running application's USB ID
+# belongs to whatever firmware is installed, not to the board.
+bootloader_usb    = ["239a:0071"]
+candidate_usb     = ["1209:0001", "239a:8071"]
+msc_label         = "HT-n5262"
+
+[board.t114.flash]
+# The bootloader generates CURRENT.UF2 from exactly this window, which is how
+# both bounds were measured without reading a single constant.
+family_id      = 0xADA52840
+writable_start = 0x1000
+writable_end   = 0xEA000
+app_base       = 0x27000
+
+[board.t114.requires]
+# Our bindings are generated from 7.0.1 and the boards run 7.3.0; Nordic keeps
+# the ABI stable within a major version. A board carrying 6.1.1 puts the
+# application boundary a page lower, so our image boots into nothing.
+softdevice = ">=7.0.1, <8.0.0"
+
+# The RAK4630 module, in every carrier built around it — the WisMesh Pocket V2
+# is the one we own (Codeberg #261). One entry serves the whole carrier family
+# because the module fixes both halves that matter: the SX1262 wiring is
+# internal to it, and so is the bootloader that publishes the Board-ID, so the
+# key and the wiring are bound to the same unit
+# (docs/src/concepts/board-support-scope.md, "The limit that bites").
+[board.rak4631]
+family    = "nrf52840"
+transport = "uf2-msc"
+# Same two, same order, and for the same reason as the T114: our firmware
+# answers the touch, stock Meshtastic does not.
+entry     = ["touch-1200", "double-tap"]
+
+[board.rak4631.identify]
+# Verbatim from the INFO_UF2.TXT this board's bootloader publishes, transcribed
+# in docs/src/concepts/lnode-flashing.md ("What the bootloader tells you"). The
+# same string `just flash-rak4631` passes as LEVICULUM_UF2_BOARD_ID.
+info_uf2_board_id = "WisBlock-RAK4631-Board"
+# Measured on the rig, docs/src/concepts/lnode-flashing.md, "Bootloader
+# (UF2/DFU)": 239a:0029 "Adafruit WisBlock RAK4631", drive label RAK4631.
+bootloader_usb    = ["239a:0029"]
+# Our own firmware's application ID (leviculum-nrf/src/boards/rak4631.rs:125).
+# Stock Meshtastic on this board enumerates under some ID of its own, and we
+# have not measured which — so it is not listed. Nothing is lost by that: a
+# board running Meshtastic answers no 1200-baud touch, so knowing its ID would
+# only let us knock on a door that does not open, and the double-tap prompt is
+# reached either way.
+candidate_usb     = ["1209:0002"]
+msc_label         = "RAK4631"
+
+[board.rak4631.flash]
+# Same nRF52840 layout as the T114, and measured the same way — the bootloader
+# generates CURRENT.UF2 from exactly this window, and on both rig boards it
+# covers 0x1000 to 0xEA000 (docs/src/concepts/lnode-flashing.md, "What a UF2 is
+# allowed to write"). The application base is the one leviculum-nrf/memory.x
+# links against for both binaries.
+family_id      = 0xADA52840
+writable_start = 0x1000
+writable_end   = 0xEA000
+app_base       = 0x27000
+
+[board.rak4631.requires]
+# The same constraint, for the same reason: our image is based at 0x27000 and
+# cannot start on a 6.1.1 boundary. The bundle carries no SoftDevice remedy for
+# this board, which is deliberate — our RAK has run 7.3.0 since we first
+# flashed it, and whether a factory Pocket V2 ships something the remedy could
+# repair is unmeasured. A precondition without a remedy is allowed and refuses
+# with "nothing was written"; inventing a remedy path for a case nobody has
+# seen is not (docs/src/concepts/lnode-flashing.md, "The SoftDevice carve-out").
+softdevice = ">=7.0.1, <8.0.0"
+
+# What a person is told when the software trigger did not work and the board
+# has to be reached by hand. Per board, because the instruction that fits a
+# T114 sends a Pocket V2 owner looking for a button that does not exist. A
+# board that says nothing here gets the default wording in
+# `lnflash::entry::double_tap_instruction`.
+[board.rak4631.double_tap]
+press = "double-tap the reset contact in the hidden pinhole beside the USB socket, with a needle — the second tap within about half a second of the first. This case has no RESET button on the outside."
+docs  = "docs/src/firmware/recovery.md, \"WisMesh Pocket V2 (RAK4631): the hidden-pinhole caveat\""

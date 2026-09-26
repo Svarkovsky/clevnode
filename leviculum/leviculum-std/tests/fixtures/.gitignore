@@ -1,0 +1,3 @@
+# Whitelist checked-in event-log fixtures despite the workspace's
+# top-level `*.log` ignore.  These are versioned test inputs.
+!*.log

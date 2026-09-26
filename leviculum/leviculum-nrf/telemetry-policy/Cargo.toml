@@ -1,0 +1,9 @@
+[package]
+name = "leviculum-telemetry-policy"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Pure telemetry send policy and target lifecycle for leviculum firmware, host-testable"
+
+[dependencies]

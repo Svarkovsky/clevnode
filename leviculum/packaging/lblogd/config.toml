@@ -1,0 +1,118 @@
+# ~~~ Installed by the lblogd Debian package ~~~
+#
+# lblogd serves a Markdown blog on two sides at once: as a NomadNet page
+# node over Reticulum, and as a web server on the clearnet.
+#
+# The settings below are a working *local* configuration: the service
+# starts as installed and serves the blog on http://127.0.0.1:8180/ with
+# no certificate, no public exposure, and no Let's Encrypt traffic. That
+# is deliberate — a package must not point a fresh install at a public
+# port under a name the operator has not chosen yet.
+#
+# To go live, see "Going public" at the bottom of this file.
+#
+# After editing, reload or restart:
+#     sudo systemctl reload lblogd     # re-read the posts only
+#     sudo systemctl restart lblogd    # re-read this file too
+#
+# Full documentation: /usr/share/doc/lblogd/README.md
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Node identity, the ACME certificate cache, and the per-day counts file.
+# Owned by the `lblogd` system user; the destination hash is derived from
+# an identity stored here, so keeping this directory is what keeps the
+# blog's address stable across restarts and upgrades.
+data_dir = "/var/lib/lblogd"
+
+# The posts themselves: one Markdown file per post. Drop a file in and
+# reload. See the README for the frontmatter block, all of which is
+# optional — a bare .md file is a valid post.
+posts_dir = "/var/lib/lblogd/posts"
+
+# Files a post can reference: pictures, mostly. Served as /files/<name>
+# on the web and /file/<name> on the mesh, so `![Mast](mast.jpg)` in a
+# post works on both sides. The directory need not exist; without it the
+# blog simply has no files. Micron has no image construct, so a mesh
+# reader sees a link that saves (NomadNet) or draws (lnomad) the picture.
+# files_dir = "/var/lib/lblogd/files"
+
+# The largest single file that will be served, in bytes (default 10 MiB).
+# A blog is not a file server, and over a LoRa interface an unbounded
+# transfer denies service to every other reader of this node for as long
+# as it runs.
+# max_file_bytes = 10485760
+
+# Reload automatically whenever posts_dir changes, instead of only on
+# SIGHUP. Convenient while writing; a deployment that publishes
+# deliberately should leave it off. Covers files_dir too.
+watch_posts = false
+
+# What a reader sees. Everything here except the title is optional.
+[blog]
+title = "A Leviculum blog"
+# author      = "Your Name"
+# description = "One sentence about this blog."
+# language    = "en"
+# Shown on the about page, which exists as soon as any of these is set.
+# email = "you@example.org"
+# lxmf  = "0000000000000000000000000000000f"
+# about = "/etc/lblogd/about.md"
+# Replaces the built-in stylesheet.
+# css = "/etc/lblogd/style.css"
+
+# How much was served, one line per day, appended to
+# /var/lib/lblogd/counts.log. On by default: it records request totals
+# and no addresses, and costs about a hundred bytes a day.
+#
+#   DAY date=2026-08-07 tz=UTC mesh_requests=41 mesh_sessions=12 \
+#       mesh_identified_requests=0 web_requests=308 web_not_found=57 \
+#       clock_behind=0 written=2026-08-07T23:59:12Z
+#
+# Requests and links, not visitors. A Reticulum link is a session, not a
+# person, and the web side deliberately never reads a peer address — so
+# there is no "unique visitors" number here, because neither side can
+# honestly produce one. See the README for the full argument.
+[counter]
+# enabled = true
+# path    = "/var/lib/lblogd/counts.log"
+
+[node]
+# Must match the instance_name of the running Reticulum daemon. "default"
+# is what both the leviculum package (/etc/reticulum/config) and an
+# unconfigured Python rnsd use.
+instance_name = "default"
+# Announced over Reticulum; defaults to blog.title. Set it only when the
+# name on the page and the name in the mesh should differ.
+# display_name = "A Leviculum blog"
+# announce_interval_secs = 21600
+
+[web]
+# Plain HTTP, no certificate. See "Going public" below.
+acme = false
+# Not 8080: that is http-alt, and the busiest port on a developer
+# machine — Syncthing, Jenkins, Tomcat and half of every docker-compose
+# file want it. A package that auto-starts must not land on a port it is
+# likely to find taken, since the failure would be a restart loop right
+# after installation. 8180 is unassigned and sits next to the http-alt
+# range, so it stays easy to guess.
+http_bind = "127.0.0.1:8180"
+
+# ~~~ Going public ~~~
+#
+# Point a domain's A/AAAA record at this machine, make ports 80 and 443
+# reachable from the internet, then replace the [web] section above with:
+#
+#   [web]
+#   acme               = true
+#   domains            = ["blog.example.org"]
+#   acme_contact_email = "you@example.org"
+#   acme_staging       = true
+#   # http_bind and https_bind default to 0.0.0.0:80 and 0.0.0.0:443.
+#
+# Leave acme_staging = true until a request succeeds: the Let's Encrypt
+# staging directory issues untrusted certificates but has generous rate
+# limits, so a misconfiguration costs nothing. Switch it to false only
+# once the staging run works, and restart.
+#
+# The unit already carries CAP_NET_BIND_SERVICE, so binding 80 and 443
+# needs no further change.

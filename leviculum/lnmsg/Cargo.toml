@@ -1,0 +1,50 @@
+[package]
+name = "lnmsg"
+# Versioned independently of the leviculum stack, like lnomad: a messenger's
+# releases track its own UI and message handling, not the protocol core it
+# happens to be built from.
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Terminal LXMF messenger for Reticulum — the non-interactive send path"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+# The LXMF router, node and message codec. Everything protocol-shaped lives
+# there; this crate is wiring, a CLI and a bounded run loop.
+leviculum-lxmf = { path = "../leviculum-lxmf" }
+# The driver seam. `CoreProcessor` is the only feed that does not drop the
+# event types LXMF needs (docs/src/concepts/lnmsg-architecture.md §3), so the
+# router runs inside the driver's tick and this dependency is not optional.
+leviculum-std = { path = "../leviculum-std" }
+# Identity minting and the on-disk identity record shared with lnomad.
+leviculum-core = { path = "../leviculum-core" }
+clap = { version = "4", features = ["derive"] }
+tokio.workspace = true
+# The structured event log (docs/src/structured-event-logs.md) is a tracing
+# layer, so the emit sites are `tracing::debug!` calls with an `event` field.
+tracing.workspace = true
+rand_core = { version = "0.6", features = ["std", "getrandom"] }
+
+[dev-dependencies]
+tempfile = "3"
+# `test-util` for the paused runtime clock: the send loop's timeouts are
+# measured on tokio's clock precisely so they can be tested without waiting.
+tokio = { version = "1", features = ["full", "test-util"] }
+# The Python daemon's JSON-RPC command port speaks JSON; the interop test is
+# the only consumer.
+serde_json = "1"
+hex = "0.4"
+
+[lib]
+name = "lnmsg"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lnmsg"
+path = "src/main.rs"

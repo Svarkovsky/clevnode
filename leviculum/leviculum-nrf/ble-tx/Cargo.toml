@@ -1,0 +1,29 @@
+[package]
+name = "leviculum-ble-tx"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Pure BLE notification flow-control policy for leviculum-nrf, host-testable"
+
+[dependencies]
+# The per-connection drain slots (`drain.rs`) are `Signal`s, so this
+# crate is no longer dependency-free. It stays host-testable: embassy-sync
+# builds for the host triple, and the only thing missing there is a
+# `critical-section` implementation, which the dev-dependency below
+# supplies for `cargo test` alone. The firmware gets its implementation
+# from nrf-softdevice, as before.
+embassy-sync = "0.7"
+# For the node-name policy (`leviculum_core::node_name`): the length and
+# character rules, and the codepoint-boundary truncation `gap_name` applies.
+# The policy is needed off the board as well — `lnflash`'s scripted firmware
+# has to shorten a name exactly as this crate does — so it lives in core and
+# the BLE-specific bound below asserts against its mirror there.
+leviculum-core = { path = "../../leviculum-core", default-features = false }
+
+[dev-dependencies]
+# Host-side `critical_section::Impl` so `CriticalSectionRawMutex` links in
+# `cargo test --target <host>`. A dev-dependency by design: it must never
+# reach the firmware build, where nrf-softdevice registers the real one
+# and two implementations are a link error.
+critical-section = { version = "1", features = ["std"] }

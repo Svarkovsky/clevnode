@@ -1,0 +1,19 @@
+# Canary budget page
+
+The document half of the figure-attribution canary. Written to a fixture
+tree as `docs/src/concepts/canary_budget.md`, and read only by
+`figure_attributions` in `leviculum-std/tests/doc_citations.rs`.
+
+It names exactly one decimal figure, **3.2 ms**, which the Rust half
+attributes to it and which must therefore pass.
+
+The figure the Rust half attributes to it *wrongly* is deliberately not
+written here in any form -- not in prose, not as an example, not as a
+number this sentence says is absent. It is spelled out only in the Rust
+fixture and in this directory's README, which the guard does not read.
+Writing it here at all, in any sentence, puts it on the page and the canary
+goes green while proving nothing. That is not hypothetical: the first
+version of this file explained which number was missing by naming it.
+
+The version string 0.8.0 is here so the canary also proves the boundary
+rule: a doc comment quoting it must not be read as quoting the figure 0.8.

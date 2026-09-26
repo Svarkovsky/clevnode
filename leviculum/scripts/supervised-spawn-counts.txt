@@ -1,0 +1,66 @@
+# Pinned census of BARE process spawns — `Command::new(..).spawn()` without
+# `leviculum_std::process::spawn_supervised`.
+#
+# A bare spawn has no kernel-enforced link to its parent: if the test binary
+# aborts or is SIGKILLed, the child simply keeps running. The failure is
+# invisible from the test's own verdict, which is how seven orphaned
+# `scripts/test_daemon.py` processes accumulated across several runs on
+# 2026-08-07 — the oldest over four hours old, one of them holding a pipe that
+# kept `just standard` alive for two hours after its verdict was decided.
+#
+# scripts/check-supervised-spawns.py compares this file against the real census
+# and fails `just fast` on any difference. Files not listed here are expected to
+# have ZERO bare spawns, so a new test binary is covered without an entry.
+#
+# Format:  <expected count>   <path from the repo root>
+# Plus one special line, `supervised-call-sites-minimum`, which is a FLOOR
+# rather than an exact count: adding a supervised spawn must stay free, but
+# deleting one is a regression a bare-spawn count cannot see, because removing
+# the process removes the bare spawn with it.
+#
+# Raising a number here is a one-line diff on purpose. Say in the commit message
+# WHY the process does not need the kernel link — which in practice means: it is
+# spawned and waited on inside one function, it runs for well under a second,
+# and it holds no port, socket, lock or device.
+#
+# Baseline measured 2026-08-07.
+
+# The mechanism itself. `cmd.spawn()` here IS the supervised spawn: it runs on
+# the dedicated forking thread, on a Command whose `pre_exec` is already armed.
+2    leviculum-std/src/process.rs
+
+# The negative control for tests/supervised_spawn.rs. This one is bare on
+# purpose and must stay bare: it is the arm that demonstrates a child surviving
+# a SIGKILLed parent, which is what makes the other arm a measurement.
+1    leviculum-std/src/bin/supervised-spawn-probe.rs
+
+# Short-lived filters, not daemons: `jl` / `jldiff` read the fixture on stdin,
+# write stdout and exit, and every one of these is `wait_with_output()`ed in the
+# same expression that spawned it. Nothing here binds a port, takes a lock or
+# opens a device, and none of them outlives the call.
+1    leviculum-std/tests/jl_filter.rs
+1    leviculum-std/tests/jl_jldiff_docs.rs
+1    leviculum-std/tests/jl_jldiff_edge_cases.rs
+1    leviculum-std/tests/jl_jldiff_fixtures.rs
+1    leviculum-std/tests/jl_jldiff_workflow.rs
+
+# Two `event-log-helper` children that emit three events each and exit; both are
+# `wait()`ed a few lines below the spawn. Sub-second, and the test's assertions
+# read the files they wrote, so a helper that failed to run is a red test rather
+# than a leak.
+2    leviculum-std/tests/event_log_multiprocess.rs
+
+# Four worker children that draw 100 port numbers each and exit; all four are
+# `wait()`ed in the same function, from one `Command` built in a loop.
+1    leviculum-std/tests/port_alloc_multiprocess.rs
+
+# The wrapper under test (`scripts/run-with-manifest.py` around a 0.4 s sleep),
+# spawned twice to race itself and once for the sweep; every child is
+# `wait_with_output()`ed in the function that spawned it, runs well under a
+# second and holds no port, socket, lock or device. PDEATHSIG supervision is
+# for daemon children that may outlive the harness, not for a harness that
+# joins.
+2    leviculum-std/tests/manifest_tmp_race.rs
+
+# Floor, not a pin. See the header.
+28   supervised-call-sites-minimum

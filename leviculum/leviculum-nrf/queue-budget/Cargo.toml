@@ -1,0 +1,9 @@
+[package]
+name = "leviculum-queue-budget"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Pure two-bound admission policy for the firmware's outbound queues, host-testable"
+
+[dependencies]

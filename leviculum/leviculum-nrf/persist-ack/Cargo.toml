@@ -1,0 +1,9 @@
+[package]
+name = "leviculum-persist-ack"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "When a control-envelope ack may claim the record reached flash, host-testable"
+
+[dependencies]

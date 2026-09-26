@@ -1,0 +1,11 @@
+[package]
+name = "leviculum-screen"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Board-independent status-screen painter for leviculum-nrf, host-testable with golden frames"
+
+[dependencies]
+embedded-graphics = "0.8"
+heapless = { version = "0.9", default-features = false }

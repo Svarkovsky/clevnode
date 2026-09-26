@@ -1,0 +1,9 @@
+[book]
+title = "Leviculum Documentation"
+authors = ["Lew Palm"]
+language = "en"
+src = "src"
+
+[output.html]
+git-repository-url = "https://codeberg.org/Lew_Palm/leviculum"
+edit-url-template = "https://codeberg.org/Lew_Palm/leviculum/src/branch/master/docs/{path}"

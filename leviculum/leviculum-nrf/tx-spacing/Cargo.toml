@@ -1,0 +1,9 @@
+[package]
+name = "leviculum-tx-spacing"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Pure on-air spacing knob for the firmware's LoRa transmit path, host-testable"
+
+[dependencies]

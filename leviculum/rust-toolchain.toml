@@ -1,0 +1,26 @@
+[toolchain]
+# Current stable is what we build with, and the pin is how every machine
+# and the pipeline agree on which compiler produced a binary. It is raised
+# deliberately at release time, on all hosts at once, rather than drifting
+# per machine on whoever last ran `rustup update`.
+#
+# The reason is not the usual reproducible-build one: this is embedded code
+# with a measured 3264-byte stack-frame margin (largest frame 13120 B against
+# a 16384 B limit) and published binaries. Codegen differences between
+# compiler versions move frame sizes, and an unattributable move is worse
+# than a scheduled bump.
+#
+# Raising the pin has a cost on every host: rustup tracks installed targets
+# per toolchain, so the new toolchain arrives carrying only what `targets`
+# below lists, and `just fast` fails on the embedded gates until someone runs
+#   rustup target add thumbv7em-none-eabihf thumbv6m-none-eabi
+channel = "1.97.1"
+# musl is the default host target (see .cargo/config.toml). Listed here
+# so rustup auto-installs it on checkout. The linker (musl-gcc) is not
+# managed by rustup — developers need `sudo apt install musl-tools`
+# (or the equivalent on their distro).
+targets = ["x86_64-unknown-linux-musl"]
+# Embedded targets (nRF52840, RP2040) are not listed here to avoid
+# forcing downloads on every developer. Add them manually:
+#   rustup target add thumbv7em-none-eabihf thumbv6m-none-eabi
+# Xtensa targets (ESP32, ESP32-S3) require espup, not rustup.

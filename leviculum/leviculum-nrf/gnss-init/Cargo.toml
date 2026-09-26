@@ -1,0 +1,9 @@
+[package]
+name = "leviculum-gnss-init"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Pure one-shot GNSS boot init for leviculum-nrf, host-testable: u-blox M8 over UBX and Quectel L76K over CASIC $PCAS, behind one ModuleInit surface"
+
+[dependencies]

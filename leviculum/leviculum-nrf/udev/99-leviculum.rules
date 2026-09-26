@@ -1,0 +1,21 @@
+# Stable symlinks for leviculum firmware USB CDC-ACM ports
+# Install: sudo cp udev/99-leviculum.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules
+#
+# Each CDC-ACM class occupies two USB interfaces (Communication + Data):
+#   Debug:     interfaces 00 (comm) + 01 (data)
+#   Transport: interfaces 02 (comm) + 03 (data)
+#
+# Per-board USB PIDs:
+#   T114:    1209:0001 → /dev/leviculum-{debug,transport}[-SERIALNUM]
+#   RAK4631: 1209:0002 → /dev/leviculum-rak-{debug,transport}[-SERIALNUM]
+#
+# With multiple boards of the same kind, only the suffixed symlinks are
+# unique; the short ones land on whichever device udev sees first.
+
+# T114
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="0001", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="leviculum-debug", SYMLINK+="leviculum-debug-%s{serial}"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="0001", ENV{ID_USB_INTERFACE_NUM}=="02", SYMLINK+="leviculum-transport", SYMLINK+="leviculum-transport-%s{serial}"
+
+# RAK4631 (WisMesh Pocket V2)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="0002", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="leviculum-rak-debug", SYMLINK+="leviculum-rak-debug-%s{serial}"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="0002", ENV{ID_USB_INTERFACE_NUM}=="02", SYMLINK+="leviculum-rak-transport", SYMLINK+="leviculum-rak-transport-%s{serial}"

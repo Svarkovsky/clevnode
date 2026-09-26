@@ -1,0 +1,15 @@
+[package]
+name = "vectors-verify"
+description = "Verifies leviculum-core against the periculum test vector corpus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = "1"
+
+[dev-dependencies]
+hex = "0.4"
+leviculum-core = { path = "../leviculum-core" }

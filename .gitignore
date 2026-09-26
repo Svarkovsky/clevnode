@@ -1,0 +1,36 @@
+# --- Build tools and SDKs ---
+tools/
+*.tar.xz
+*.tar.gz
+
+# --- Rust artifacts ---
+leviculum/target/
+leviculum/.cargo/
+leviculum/libunwind.a
+
+# --- C build artifacts ---
+clevnode/clevnode
+clevnode/Makefile
+clevnode/libleviculum.a
+clevnode/libunwind.a
+*.o
+*.a
+
+# --- Runtime data, keys and storage (CRITICAL: Do not commit!) ---
+clevnode/identities/
+# clevnode/posts/ (not ignored to keep default index.mu)
+clevnode/files/
+clevnode/reticulum/storage/
+clevnode/lblogd.toml
+*.log
+
+# --- Releases and Secrets ---
+Releases/
+push_github.sh
+
+# --- System and IDE files ---
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/

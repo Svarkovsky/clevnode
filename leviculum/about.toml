@@ -1,0 +1,75 @@
+# cargo-about configuration for the third-party notice file that ships
+# with every published binary (Codeberg #288).
+#
+# Regenerate with `just notices`; the guard `just notices-guard` (part of
+# `just fast`) regenerates into a temporary file and diffs, so a new
+# dependency that nobody re-generated for turns the push path red.
+#
+# The obligation this serves: MIT and BSD-3-Clause both require their
+# copyright line and permission text to accompany BINARY distributions,
+# not only source. Our own LICENSE (AGPL-3.0) says nothing about them,
+# so a .deb or tarball carrying only LICENSE was short a notice for
+# every such crate statically linked into it.
+
+# The two triples every published binary is built for
+# (scripts/build-deb.sh). Filtering by target keeps Windows- and
+# macOS-only crates out of a list that claims to describe what is
+# linked into the artifacts we actually ship.
+targets = [
+    "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
+]
+
+# Test-only crates are not linked into anything published, so listing
+# them would overstate what the binaries contain.
+ignore-dev-dependencies = true
+
+# Build-dependencies stay in. They are over-inclusive rather than wrong:
+# a build script's code does not reach the shipped binary, but some of
+# them (ring's C sources, for one) do contribute compiled objects, and
+# distinguishing the two mechanically is not possible from the manifest
+# alone. An extra notice is harmless; a missing one is the defect.
+ignore-build-dependencies = false
+
+# Licence choice for the shipped binaries. Order is preference order for
+# crates offering a choice (`MIT OR Apache-2.0` and friends): we take
+# the first accepted entry.
+#
+# Convention for dual-licensed crates: prefer Apache-2.0 where offered.
+# Its notice obligation (§4) is explicit about what must travel with a
+# binary — the NOTICE file and the licence copy — where MIT's "the above
+# copyright notice ... shall be included in all copies" leaves us to
+# reconstruct the copyright line ourselves. Both are satisfied by this
+# file; Apache-2.0 just states the requirement we are already meeting.
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    # Our own crates. They appear here because cargo-about resolves the
+    # whole graph including the workspace members; the template renders
+    # this group as a pointer to LICENSE rather than a second copy of
+    # the AGPL text, which every artifact already carries.
+    "AGPL-3.0-or-later",
+    # libbz2-rs-sys ships under the bzip2 project's own BSD-style
+    # licence, which SPDX registers under this id.
+    "bzip2-1.0.6",
+    # webpki-roots is a data set (Mozilla's CA bundle), licensed as
+    # data rather than as code.
+    "CDLA-Permissive-2.0",
+    "BSD-3-Clause",
+    "BSD-2-Clause",
+    "ISC",
+    "Zlib",
+    "MPL-2.0",
+    "BSL-1.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "Unlicense",
+    "OpenSSL",
+    "AGPL-3.0",
+]
+
+# Our own crates carry the AGPL text in LICENSE, which every artifact
+# already ships; repeating it once per workspace member would bury the
+# third-party notices this file exists for.
+workarounds = []

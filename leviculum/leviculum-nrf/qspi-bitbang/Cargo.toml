@@ -1,0 +1,9 @@
+[package]
+name = "leviculum-qspi-bitbang"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Single-line JEDEC-id shifter for the QSPI pins, driven bit by bit, host-testable against a replaying part"
+
+[dependencies]

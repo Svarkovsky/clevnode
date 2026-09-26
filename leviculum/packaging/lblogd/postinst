@@ -1,0 +1,88 @@
+#!/bin/sh
+# postinst for lblogd — provisions the service user and the data
+# directory the daemon needs before it can start. Idempotent; safe to
+# re-run on upgrade (case=configure with a $2 previous version).
+
+set -e
+
+DATA_DIR=/var/lib/lblogd
+POSTS_DIR="$DATA_DIR/posts"
+
+case "$1" in
+    configure)
+        if ! getent group lblogd >/dev/null; then
+            addgroup --quiet --system lblogd
+        fi
+
+        if ! getent passwd lblogd >/dev/null; then
+            adduser --quiet --system \
+                --ingroup lblogd \
+                --home "$DATA_DIR" --no-create-home \
+                --gecos "Leviculum dev-blog server" \
+                --shell /usr/sbin/nologin \
+                lblogd
+        fi
+
+        # The daemon reads posts_dir at startup and fails if it does not
+        # exist, so both directories are created here rather than left to
+        # the operator. 0750 keeps the node identity and the ACME account
+        # key — both of which live under data_dir — off other accounts.
+        mkdir -p "$POSTS_DIR"
+        chown -R lblogd:lblogd "$DATA_DIR"
+        chmod 0750 "$DATA_DIR"
+        chmod 0750 "$POSTS_DIR"
+
+        # First install only: leave one post behind so the freshly started
+        # service serves a page instead of an empty index, and so the post
+        # format is visible at the place the operator will look for it.
+        # Skipped on upgrade, and skipped if any post already exists, so a
+        # deleted welcome post stays deleted.
+        if [ -z "$2" ] && [ -z "$(ls -A "$POSTS_DIR" 2>/dev/null)" ]; then
+            cat >"$POSTS_DIR/welcome.md" <<'WELCOME'
++++
+title = "It works"
++++
+
+This post was installed by the `lblogd` package so the blog would have
+something to show. Delete it whenever you like.
+
+A post is a Markdown file in `/var/lib/lblogd/posts`. The `+++` block at
+the top is optional, and so is every key in it: without a `title` the
+filename is used, and without a `date` the file's modification time is.
+
+Publish by adding a file and reloading:
+
+    sudo cp my-post.md /var/lib/lblogd/posts/
+    sudo systemctl reload lblogd
+
+See `/usr/share/doc/lblogd/README.md` for the full format, the NomadNet
+side, and how to switch this server over to a public domain with HTTPS.
+WELCOME
+            chown lblogd:lblogd "$POSTS_DIR/welcome.md"
+            chmod 0640 "$POSTS_DIR/welcome.md"
+        fi
+
+        if [ -z "$2" ]; then
+            echo ""
+            echo "lblogd: serving on http://127.0.0.1:8180/ once started."
+            echo "Posts live in $POSTS_DIR; after adding one, run:"
+            echo "    sudo systemctl reload lblogd"
+            echo ""
+            echo "The NomadNet side needs a running Reticulum daemon (lnsd"
+            echo "from the 'leviculum' package, or the Python rnsd) using"
+            echo "instance_name 'default'. Print the blog's mesh address with:"
+            echo "    sudo -u lblogd lblogd --config /etc/lblogd/config.toml --print-hash"
+            echo ""
+            echo "To publish on a public domain with HTTPS, see the"
+            echo "'Going public' section in /etc/lblogd/config.toml."
+            echo ""
+        fi
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

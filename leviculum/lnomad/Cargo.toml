@@ -1,0 +1,102 @@
+[package]
+name = "lnomad"
+# Versioned independently of the leviculum stack — see the note in
+# lblogd/Cargo.toml. A browser's releases track its own UI and rendering
+# work, not the protocol core it happens to be built from.
+version = "0.1.1"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Terminal browser and ANSI renderer for NomadNet micron pages"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+# `cargo deb -p lnomad --target x86_64-unknown-linux-musl` builds a
+# musl-static .deb. Deliberately a separate package from `leviculum`:
+# that package auto-enables and starts the lnsd systemd service, which
+# a browser-only user must not get pulled in.
+[package.metadata.deb]
+name = "lnomad"
+maintainer = "Lew Palm <lp@lew-palm.de>"
+copyright = "2025, Lew Palm"
+license-file = ["../LICENSE", "0"]
+extended-description = """\
+Nomadnet terminal browser for the Reticulum network. Connects to a
+local shared RNS instance — leviculum's lnsd or the Python rnsd —
+fetches micron pages, and renders them in the terminal.
+"""
+section = "net"
+priority = "optional"
+# The binary is musl-static, so cargo-deb's `$auto` would find no
+# shared-library deps and only emit a warning. There is no hard runtime
+# dependency either: any RNS instance satisfies the need, so leviculum
+# is a Recommends, not a Depends.
+#
+# `depends` is left unset on purpose. cargo-deb emits `Depends:` with an
+# empty value either way — Debian wants the field omitted entirely when
+# there are no dependencies — so scripts/deb-finalize.sh strips it back
+# out after the build.
+recommends = "leviculum"
+assets = [
+    # cargo-deb only recognises "target/release/..." exactly as a Cargo
+    # target path and auto-substitutes the --target triple into it. Any
+    # prefix disables the rewrite and silently picks up stale non-musl
+    # builds — see leviculum-cli/Cargo.toml.
+    ["target/release/lnomad", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/lnomad/README.md", "644"],
+    # Rendered from docs/src/man/ by scripts/md2man.py; see lblogd's
+    # manifest for why the Markdown under docs/ is the single source.
+    ["../target/man/lnomad.1", "usr/share/man/man1/lnomad.1", "644"],
+    # Documented overrides for the two lintian tags that a
+    # musl-static binary always trips; the file explains why each
+    # is a deliberate deviation rather than a defect.
+    ["../packaging/lintian/lnomad", "usr/share/lintian/overrides/lnomad", "644"],
+    # Codeberg #288; see leviculum-cli/Cargo.toml for what this file is and
+    # why a musl-static package needs it.
+    ["../THIRD-PARTY-NOTICES", "usr/share/doc/lnomad/THIRD-PARTY-NOTICES", "644"],
+]
+changelog = "../target/deb-changelog/lnomad"
+
+[dependencies]
+leviculum-micron = { path = "../leviculum-micron" }
+leviculum-std = { path = "../leviculum-std" }
+leviculum-core = { path = "../leviculum-core" }
+rmpv.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+serde.workspace = true
+toml.workspace = true
+clap = { version = "4", features = ["derive"] }
+terminal_size = "0.4"
+ratatui = "0.30.2"
+crossterm = { version = "0.29.0", features = ["event-stream"] }
+unicode-width = "0.2.2"
+futures = "0.3.32"
+tui-input = "0.15"
+termbg = "0.6.2"
+open = "5"
+# Inline images. `default-features = false` is not optional: the default
+# `chafa-dyn` feature makes the build probe for libchafa via pkg-config, which
+# would put a C library in the path of the musl-static .deb. Without it the
+# crate is pure Rust and still carries Kitty, iTerm2, Sixel (icy_sixel) and
+# Unicode halfblocks, which is the whole fallback ladder we need.
+ratatui-image = { version = "11.0", default-features = false, features = ["crossterm"] }
+# Decoding only. `image`'s default feature set pulls in every codec it knows;
+# these three are what a blog post actually carries, and each extra decoder is
+# attack surface for bytes handed to us by a stranger's node.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif"] }
+
+[dev-dependencies]
+tempfile = "3"
+hex = "0.4"
+
+[lib]
+name = "lnomad"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lnomad"
+path = "src/main.rs"

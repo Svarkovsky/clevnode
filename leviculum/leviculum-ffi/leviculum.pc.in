@@ -1,0 +1,13 @@
+prefix=@PREFIX@
+libdir=@LIBDIR@
+includedir=@INCLUDEDIR@
+
+Name: leviculum
+Description: Leviculum, a Reticulum network stack, C API
+URL: https://codeberg.org/Lew_Palm/leviculum
+Version: @VERSION@
+Libs: -L${libdir} -lleviculum
+# System libraries the static archive (libleviculum.a) needs; surfaced by
+# `pkg-config --static`. Harmless and unused for the default dynamic link.
+Libs.private: -lpthread -ldl -lm
+Cflags: -I${includedir}

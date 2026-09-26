@@ -1,0 +1,77 @@
+# Fuzz harness for the wire-format parsers that consume untrusted bytes.
+# Detached from the parent workspace (own `[workspace]` table) because it
+# builds only on nightly with libFuzzer/ASan and is excluded from `just
+# standard`. Build/run with the glibc host target, not the workspace musl
+# default:
+#   cargo +nightly fuzz run <target> --target x86_64-unknown-linux-gnu
+[package]
+name = "leviculum-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.leviculum-core]
+path = ".."
+
+# Detach from the repo workspace: nightly-only, not a workspace member.
+[workspace]
+
+[profile.release]
+debug = 1
+
+# One target per high-exposure untrusted-input parser. Ranked by exposure
+# in fuzz/README.md.
+[[bin]]
+name = "packet_unpack"
+path = "fuzz_targets/packet_unpack.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resource_advertisement_unpack"
+path = "fuzz_targets/resource_advertisement_unpack.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "discovery_announce"
+path = "fuzz_targets/discovery_announce.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "announce_from_packet"
+path = "fuzz_targets/announce_from_packet.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ifac_verify"
+path = "fuzz_targets/ifac_verify.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "hdlc_deframe"
+path = "fuzz_targets/hdlc_deframe.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "kiss_deframe"
+path = "fuzz_targets/kiss_deframe.rs"
+test = false
+doc = false
+bench = false

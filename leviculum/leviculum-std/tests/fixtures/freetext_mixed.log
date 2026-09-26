@@ -1,0 +1,34 @@
+running 1 test
+test mvr::link_failure_recovery_silent_resume::link_failure_recovery_silent_resume_with_forced_announce ... FAILED
+
+failures:
+
+---- mvr::link_failure_recovery_silent_resume::link_failure_recovery_silent_resume_with_forced_announce stdout ----
+[INFO ] starting daemon alpha
+[INFO ] daemon alpha listening on 127.0.0.1:54321
+=== EVENT LOG DUMP (test panicked, 14 lines) ===
+PKT_RX node=alpha dst=abc1 hops=0 iface=lora0 len=64 type=Announce t=10
+ANN_RX node=alpha dst=abc1 hops=0 iface=lora0 path_response=false t=10
+PATH_ADD node=alpha dst=abc1 hops=0 iface=lora0 next_hop=alpha ok=true source=announce table_len=1 t=11
+[WARN ] interface lora0 stalled for 200 ms
+PKT_RX node=alpha dst=abc1 hops=0 iface=lora0 len=160 type=Data t=80
+PKT_LOCAL node=alpha dst=abc1 iface=lora0 matched=true t=81
+PKT_DROP node=alpha dst=abc2 hops=3 iface_in=lora0 reason=ttl_expired type=Data t=120
+[ERROR] forced announce failed to propagate
+PKT_RX node=alpha dst=abc1 hops=0 iface=lora0 len=200 type=Data t=200
+PKT_LOCAL node=alpha dst=abc1 iface=lora0 matched=true t=201
+PKT_RX node=alpha dst=abc3 hops=1 iface=tcp1 len=72 type=Announce t=240
+PKT_FORWARD node=alpha dst=abc3 hops=1 iface_in=tcp1 iface_out=lora0 next_hop=beta type=Data t=242
+ANN_RX node=alpha dst=abc4 hops=2 iface=lora0 path_response=false t=300
+PATH_ADD node=alpha dst=abc4 hops=2 iface=lora0 next_hop=beta ok=true source=announce table_len=2 t=301
+=== END EVENT LOG DUMP ===
+
+thread 'mvr::link_failure_recovery_silent_resume::link_failure_recovery_silent_resume_with_forced_announce' panicked at leviculum-std/tests/mvr/link_failure_recovery_silent_resume.rs:42:5:
+expected announce to reach beta within 5s
+
+failures:
+    mvr::link_failure_recovery_silent_resume::link_failure_recovery_silent_resume_with_forced_announce
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.42s
+
+error: test failed, to rerun pass `-p leviculum-std --test mvr`

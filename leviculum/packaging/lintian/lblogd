@@ -1,0 +1,14 @@
+# The binary is musl-static by design, which trips two lintian checks
+# that both assume a normal dynamically-linked Debian binary.
+#
+# unstripped-binary-or-object: the build passes --no-strip on purpose.
+# cargo-deb's default `strip --strip-all` corrupts musl-static binaries
+# and they SIGSEGV at startup; rustc has already dropped debuginfo at
+# link time, so there is nothing left worth stripping anyway.
+lblogd: unstripped-binary-or-object [usr/bin/lblogd]
+
+# shared-library-lacks-prerequisites: lintian reads the static PIE as a
+# shared library. It is an executable, and having no dynamic
+# prerequisites is the entire point — these packages install on any
+# Debian >= 9 regardless of host glibc.
+lblogd: shared-library-lacks-prerequisites [usr/bin/lblogd]

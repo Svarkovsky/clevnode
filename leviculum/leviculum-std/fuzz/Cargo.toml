@@ -1,0 +1,38 @@
+# Fuzz harness for the leviculum-std wire-format parsers that consume
+# untrusted bytes. Detached from the parent workspace (own `[workspace]`
+# table) because it builds only on nightly with libFuzzer/ASan and is excluded
+# from `just standard`. Build/run with the glibc host target, not the
+# workspace musl default:
+#   cargo +nightly fuzz run <target> --target x86_64-unknown-linux-gnu
+#
+# Separate from `leviculum-core/fuzz/` because the parser under test lives in
+# leviculum-std; pulling leviculum-std into the core fuzz crate would drag the
+# whole daemon stack into a crate named for core.
+[package]
+name = "leviculum-std-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.leviculum-std]
+path = ".."
+
+# Detach from the repo workspace: nightly-only, not a workspace member.
+[workspace]
+
+[profile.release]
+debug = 1
+
+# One target per untrusted-input parser. Ranked by exposure in fuzz/README.md.
+[[bin]]
+name = "sam_parse"
+path = "fuzz_targets/sam_parse.rs"
+test = false
+doc = false
+bench = false

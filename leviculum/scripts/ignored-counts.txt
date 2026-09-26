@@ -1,0 +1,51 @@
+# Pinned census of #[ignore]d tests, one line per test unit (Codeberg #191c).
+#
+# An #[ignore]d test is run by nothing. It compiles, it is registered, and
+# it is never executed: Codeberg #189 found a suite that had been in that
+# state for a month while it was broken, and nothing anywhere said so.
+# This file makes the size of that bucket a reviewed number instead of a
+# side effect. scripts/check-ignored-counts.py compares it against the
+# real census and fails `just standard` on any difference.
+#
+# Format:  <expected count>   <cargo selector for the unit>
+# Units not listed here are expected to have ZERO ignored tests, so a new
+# test binary is covered without an entry. Lines starting with # and blank
+# lines are ignored.
+#
+# Raising a number here is a one-line diff on purpose. That is the whole
+# mechanism: adding a legitimately-ignored test stays cheap, but the
+# decision lands in a diff a reviewer can ask about. Say in the commit
+# message WHY the test cannot be routed into a tier and WHERE it does get
+# run instead.
+#
+# Baseline measured 2026-08-05 (Codeberg #191): 35 workspace-wide.
+
+3    -p leviculum-core --lib
+3    -p leviculum-core --doc
+
+# measure_send_lock_costs is a timing harness for the lock-budget doc page,
+# not a behaviour test: it prints microseconds and asserts nothing. Run by
+# hand with `--ignored --nocapture` when that page is re-measured.
+1    -p leviculum-lxmf --lib
+
+# Batch B2 of #196 landed the build epoch and took the last two staged red
+# tests (U5, U17) green, so this drops from 4 to 2. Both remaining stay for
+# good — the U16 timing harness, and the case marked CANNOT BE ARRANGED (it
+# needs a core-side inbound Resource cancel).
+2    -p leviculum-lxmf --test direct_delivery_attempts
+
+4    -p leviculum-std --lib
+1    -p leviculum-std --doc
+9    -p leviculum-std --test mvr
+
+# 20 in rnsd_interop, of which the three status_parity_tests::* are NOT
+# unobserved: `just standard` runs them by name through
+# scripts/run-status-parity.sh (Codeberg #191a). They keep the #[ignore]
+# because they must run serially, apart from the parallel suite.
+#
+# 15 -> 20 (2026-08-30): the five rpc_interop_tests::* that drive a client
+# out of LEVICULUM_RNS_ROOT — an RNS 1.5.2 checkout that is deliberately not
+# vendored, so a fresh clone cannot run them. They run by hand against
+# /home/lew/coding/Reticulum in every batch touching the RPC/compat surface,
+# and before releases.
+20   -p leviculum-std --test rnsd_interop

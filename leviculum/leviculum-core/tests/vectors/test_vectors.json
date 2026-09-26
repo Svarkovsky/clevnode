@@ -1,0 +1,269 @@
+{
+  "identity": {
+    "private_key": "a8abababababababababababababababababababababababababababababab00cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd01",
+    "public_key": "db693f49536fa525f23be9b4eb8cf0b55ff916b9e4f8c24c2f14c644d28de551c79ebcf07498b5c3bc1bbebb3b725246f17517a58dde98fc54b220d65fcc7672",
+    "hash": "9a383ba8ef0272460508d07f59354827"
+  },
+  "signing": {
+    "message": "74657374206d65737361676520666f72207369676e696e67",
+    "signature": "725f7854903ae9ea0c04289ea5d0d1ac9d711959c51113ed530f246efd1f466e9a6fc3aba9191af72e28b5c82b04ac0b888b13b7c61c91add7748feca6c2d209"
+  },
+  "hkdf": {
+    "ikm": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+    "salt": "000102030405060708090a0b0c",
+    "info": "f0f1f2f3f4f5f6f7f8f9",
+    "length": 64,
+    "output": "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865b4b0a85a993b89b9b65683d60f0106d28fff039d0b6f"
+  },
+  "hkdf_no_context": {
+    "ikm": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+    "salt": "000102030405060708090a0b0c",
+    "length": 64,
+    "output": "b2a3d45126d31fb6828ef00d76c6d54e9c2bd4785e49c6ad86e327d89d0de9408eeda1cbef2b03f30e053d5be784c2ab37f5a4de412baa10f01f456e9772aae7"
+  },
+  "token": {
+    "key": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeffffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100",
+    "iv": "0f0e0d0c0b0a09080706050403020100",
+    "plaintext": "48656c6c6f2c205265746963756c756d21",
+    "ciphertext": "b61e5d490d7bbe2326231d581538f7d2e6e73ccf162354f47ee0835a7c2cc178",
+    "token": "0f0e0d0c0b0a09080706050403020100b61e5d490d7bbe2326231d581538f7d2e6e73ccf162354f47ee0835a7c2cc178ba09df160dd3e221389f497616327c1ec3f03d46fafefa20fccc3064f91dba82"
+  },
+  "identity_encrypt": {
+    "identity_public_key": "db693f49536fa525f23be9b4eb8cf0b55ff916b9e4f8c24c2f14c644d28de551c79ebcf07498b5c3bc1bbebb3b725246f17517a58dde98fc54b220d65fcc7672",
+    "identity_hash": "9a383ba8ef0272460508d07f59354827",
+    "ephemeral_private_key": "b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b802",
+    "ephemeral_public_key": "ac59b9d50a8dd6b279397b12ae50df3cfb97db8d2fb3aa9c54b8c11bc2e93179",
+    "shared_key": "96411b114ff6e245d11d7664714b2384341f7fae97b887c960022c251ddff522",
+    "derived_key": "6b221c34417e433b0f6185438359b0188555c939cf650494c577f05429ff99f7ae65afff4fc8f00f6458ca7e00b1b71017f526ee2f417bcb4897500c158ed379",
+    "plaintext": "536563726574206d65737361676520666f72206964656e74697479",
+    "iv": "1a2b3c4d5e6f708192a3b4c5d6e7f801",
+    "token_ciphertext": "1a2b3c4d5e6f708192a3b4c5d6e7f80157f36b300566ea5d816e667b65d78815f3b333d139ec62e6b6a330d5273edae7a2784d9f22d6cd0cceb4a2b2dbca4755c0413c7e5b5d848c8342b58a01becd70",
+    "full_ciphertext": "ac59b9d50a8dd6b279397b12ae50df3cfb97db8d2fb3aa9c54b8c11bc2e931791a2b3c4d5e6f708192a3b4c5d6e7f80157f36b300566ea5d816e667b65d78815f3b333d139ec62e6b6a330d5273edae7a2784d9f22d6cd0cceb4a2b2dbca4755c0413c7e5b5d848c8342b58a01becd70"
+  },
+  "destination": {
+    "app_name": "test",
+    "aspects": [
+      "echo",
+      "request"
+    ],
+    "full_name": "test.echo.request",
+    "name_hash": "11eaf49ef56226355317",
+    "identity_hash": "9a383ba8ef0272460508d07f59354827",
+    "destination_hash": "25f755eb2153f51929b0d8eb2548c39a"
+  },
+  "packet_flags": [
+    {
+      "name": "data_h1_broadcast_single",
+      "header_type": 0,
+      "context_flag": 0,
+      "transport_type": 0,
+      "dest_type": 0,
+      "packet_type": 0,
+      "expected_flags": 0
+    },
+    {
+      "name": "announce_h1_broadcast_single",
+      "header_type": 0,
+      "context_flag": 0,
+      "transport_type": 0,
+      "dest_type": 0,
+      "packet_type": 1,
+      "expected_flags": 1
+    },
+    {
+      "name": "linkrequest_h1_broadcast_single",
+      "header_type": 0,
+      "context_flag": 0,
+      "transport_type": 0,
+      "dest_type": 0,
+      "packet_type": 2,
+      "expected_flags": 2
+    },
+    {
+      "name": "proof_h1_broadcast_link",
+      "header_type": 0,
+      "context_flag": 0,
+      "transport_type": 0,
+      "dest_type": 2,
+      "packet_type": 3,
+      "expected_flags": 11
+    },
+    {
+      "name": "data_h2_transport_single",
+      "header_type": 1,
+      "context_flag": 0,
+      "transport_type": 1,
+      "dest_type": 0,
+      "packet_type": 0,
+      "expected_flags": 80
+    },
+    {
+      "name": "data_h1_context_set",
+      "header_type": 0,
+      "context_flag": 1,
+      "transport_type": 0,
+      "dest_type": 0,
+      "packet_type": 0,
+      "expected_flags": 32
+    },
+    {
+      "name": "data_h1_group",
+      "header_type": 0,
+      "context_flag": 0,
+      "transport_type": 0,
+      "dest_type": 1,
+      "packet_type": 0,
+      "expected_flags": 4
+    },
+    {
+      "name": "all_high_bits",
+      "header_type": 1,
+      "context_flag": 1,
+      "transport_type": 1,
+      "dest_type": 3,
+      "packet_type": 3,
+      "expected_flags": 127
+    }
+  ],
+  "packets": [
+    {
+      "name": "simple_data_packet",
+      "flags": 0,
+      "hops": 0,
+      "header_type": 0,
+      "dest_hash": "01020304050607080910111213141516",
+      "context": 0,
+      "data": "48656c6c6f",
+      "raw_packet": "0000010203040506070809101112131415160048656c6c6f"
+    },
+    {
+      "name": "linkrequest_packet",
+      "flags": 2,
+      "hops": 0,
+      "header_type": 0,
+      "dest_hash": "01020304050607080910111213141516",
+      "context": 0,
+      "data": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "raw_packet": "0200010203040506070809101112131415160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "data_packet_h2",
+      "flags": 80,
+      "hops": 5,
+      "header_type": 1,
+      "transport_id": "a1a2a3a4a5a6a7a8a9aaabacadaeafa0",
+      "dest_hash": "01020304050607080910111213141516",
+      "context": 0,
+      "data": "48656c6c6f",
+      "raw_packet": "5005a1a2a3a4a5a6a7a8a9aaabacadaeafa0010203040506070809101112131415160048656c6c6f"
+    },
+    {
+      "name": "keepalive_packet",
+      "flags": 40,
+      "hops": 0,
+      "header_type": 0,
+      "dest_hash": "01020304050607080910111213141516",
+      "context": 250,
+      "data": "",
+      "raw_packet": "280001020304050607080910111213141516fa"
+    }
+  ],
+  "link_request": {
+    "ephemeral_private_key": "c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c803",
+    "ephemeral_public_key": "cd34f393e90a652c2bc804022f7ab6b06cfedf1bb3337d461fa772a85d808d74",
+    "signing_seed": "d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d804",
+    "verifying_public_key": "22dfe7495327f0527705f91fea28d92295cccc775d3a5cad37dee163b0ead692",
+    "request_data": "cd34f393e90a652c2bc804022f7ab6b06cfedf1bb3337d461fa772a85d808d7422dfe7495327f0527705f91fea28d92295cccc775d3a5cad37dee163b0ead692"
+  },
+  "link_id": {
+    "raw_packet": "0200e1e2e3e4e5e6e7e8e9eaebecedeeefe000cd34f393e90a652c2bc804022f7ab6b06cfedf1bb3337d461fa772a85d808d7422dfe7495327f0527705f91fea28d92295cccc775d3a5cad37dee163b0ead692",
+    "hashable_part": "02e1e2e3e4e5e6e7e8e9eaebecedeeefe000cd34f393e90a652c2bc804022f7ab6b06cfedf1bb3337d461fa772a85d808d7422dfe7495327f0527705f91fea28d92295cccc775d3a5cad37dee163b0ead692",
+    "link_id": "8bfbb771716ca6309badd79a50568288"
+  },
+  "announce": {
+    "app_name": "myapp",
+    "aspects": [
+      "service",
+      "echo"
+    ],
+    "full_name": "myapp.service.echo",
+    "name_hash": "20b423a31e252bab3f92",
+    "random_hash": "f1f2f3f4f5f6f7f8f9fa",
+    "identity_hash": "9a383ba8ef0272460508d07f59354827",
+    "destination_hash": "a0a9833618cb03a16c6c95cc6df8aa28",
+    "public_key": "db693f49536fa525f23be9b4eb8cf0b55ff916b9e4f8c24c2f14c644d28de551c79ebcf07498b5c3bc1bbebb3b725246f17517a58dde98fc54b220d65fcc7672",
+    "signed_data": "a0a9833618cb03a16c6c95cc6df8aa28db693f49536fa525f23be9b4eb8cf0b55ff916b9e4f8c24c2f14c644d28de551c79ebcf07498b5c3bc1bbebb3b725246f17517a58dde98fc54b220d65fcc767220b423a31e252bab3f92f1f2f3f4f5f6f7f8f9fa48656c6c6f2066726f6d205265746963756c756d21",
+    "signature": "9d373b3420730db9946e91fcacf71f1a6cbb6a58959b4c39ab9d0426c5829050cee51e192b0bce71b74b6a9d021766bd76512bb6be92893a33bc9bb280615d02",
+    "app_data": "48656c6c6f2066726f6d205265746963756c756d21",
+    "payload": "db693f49536fa525f23be9b4eb8cf0b55ff916b9e4f8c24c2f14c644d28de551c79ebcf07498b5c3bc1bbebb3b725246f17517a58dde98fc54b220d65fcc767220b423a31e252bab3f92f1f2f3f4f5f6f7f8f9fa9d373b3420730db9946e91fcacf71f1a6cbb6a58959b4c39ab9d0426c5829050cee51e192b0bce71b74b6a9d021766bd76512bb6be92893a33bc9bb280615d0248656c6c6f2066726f6d205265746963756c756d21"
+  },
+  "announce_no_app_data": {
+    "destination_hash": "a0a9833618cb03a16c6c95cc6df8aa28",
+    "signed_data": "a0a9833618cb03a16c6c95cc6df8aa28db693f49536fa525f23be9b4eb8cf0b55ff916b9e4f8c24c2f14c644d28de551c79ebcf07498b5c3bc1bbebb3b725246f17517a58dde98fc54b220d65fcc767220b423a31e252bab3f92f1f2f3f4f5f6f7f8f9fa",
+    "signature": "5c63541915ff8352c2ba4871652b0e400415aaef49a8c58bd9b70b6e6f0142c7b625e167f321c3b59d40f94b25f03f99bdf2e6a3cf50d2f98b32424fef323b08",
+    "payload": "db693f49536fa525f23be9b4eb8cf0b55ff916b9e4f8c24c2f14c644d28de551c79ebcf07498b5c3bc1bbebb3b725246f17517a58dde98fc54b220d65fcc767220b423a31e252bab3f92f1f2f3f4f5f6f7f8f9fa5c63541915ff8352c2ba4871652b0e400415aaef49a8c58bd9b70b6e6f0142c7b625e167f321c3b59d40f94b25f03f99bdf2e6a3cf50d2f98b32424fef323b08"
+  },
+  "link_proof": {
+    "link_id": "8bfbb771716ca6309badd79a50568288",
+    "initiator_x25519_private": "c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c803",
+    "initiator_x25519_public": "cd34f393e90a652c2bc804022f7ab6b06cfedf1bb3337d461fa772a85d808d74",
+    "initiator_ed25519_seed": "d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d804",
+    "initiator_ed25519_public": "22dfe7495327f0527705f91fea28d92295cccc775d3a5cad37dee163b0ead692",
+    "responder_x25519_private": "e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e805",
+    "responder_x25519_public": "b721664ad4d3e0482762960a13556e70d48c5e0ff67d816893881081affe2e7e",
+    "responder_signing_public": "c79ebcf07498b5c3bc1bbebb3b725246f17517a58dde98fc54b220d65fcc7672",
+    "signalling_bytes": "2001f4",
+    "signed_data": "8bfbb771716ca6309badd79a50568288cd34f393e90a652c2bc804022f7ab6b06cfedf1bb3337d461fa772a85d808d7422dfe7495327f0527705f91fea28d92295cccc775d3a5cad37dee163b0ead6922001f4",
+    "signature": "58f01d3bd72429c66fa1bc6de10d03783156491ba1286ab857eb268976a4aff5b27f6cc903705e090062c61605697ed06f5dea966e7585933aee4c41c377c70a",
+    "proof_payload": "58f01d3bd72429c66fa1bc6de10d03783156491ba1286ab857eb268976a4aff5b27f6cc903705e090062c61605697ed06f5dea966e7585933aee4c41c377c70ab721664ad4d3e0482762960a13556e70d48c5e0ff67d816893881081affe2e7e2001f4",
+    "shared_key": "aae0b4649daac70183ea85bb218bf9fca508b6af6251e537e1a4d230fa57ed1f",
+    "derived_key": "f3b1e042778718beaa630f70baef6586dfc80ac939f1539fec6244ef5d97bdbca3cc475c20c9e1f27944ff977184fd92ff687b72350acc8bb445e5aef5736a10"
+  },
+  "hdlc": {
+    "flag": 126,
+    "escape": 125,
+    "escape_xor": 32,
+    "simple": {
+      "data": "48656c6c6f",
+      "framed": "7e48656c6c6f7e"
+    },
+    "with_flag": {
+      "data": "007eff",
+      "framed": "7e007d5eff7e"
+    },
+    "with_escape": {
+      "data": "007dff",
+      "framed": "7e007d5dff7e"
+    },
+    "with_both": {
+      "data": "7e007dff",
+      "framed": "7e7d5e007d5dff7e"
+    },
+    "packet": {
+      "data": "0000010203040506070809101112131415160048656c6c6f",
+      "framed": "7e0000010203040506070809101112131415160048656c6c6f7e"
+    }
+  },
+  "ifac": {
+    "netname": "testnet",
+    "netkey": "secretkey123",
+    "ifac_size": 16,
+    "ifac_salt": "adf54d882c9a9b80771eb4995d702d4a3e733391b2a0f53f416d9f907e55cff8",
+    "netname_hash": "9afbce9f2416520733bacb370315d32b6b2c43d6097576df1c1222859d91eecc",
+    "netkey_hash": "dd02b8d024c452f72198d728abb60a355dcbf0526c867909d39e09464cd72185",
+    "ifac_origin": "9afbce9f2416520733bacb370315d32b6b2c43d6097576df1c1222859d91eeccdd02b8d024c452f72198d728abb60a355dcbf0526c867909d39e09464cd72185",
+    "ifac_origin_hash": "12b02a54f377c28d7575bb68b805d030e753ee45a8d6b3deb8d84d5cccaff24c",
+    "ifac_key": "84e3545c137980b34a889a9622604791a57a0d18ed364e04f59d58d71748989258da523ccbf679869f75a35de27e945dd41dd00fa0abd3389d993d09d83dbcd1",
+    "ifac_identity_hash": "e61b06c793311911baa7e311c939afc8",
+    "test_packet": "0001020304050607080910111213141516171819",
+    "signature": "22752fa3a1432c816210794b81d50332e0c99caf53c341ba2d82d8107d99ab0ee9b9331c384dcc4156ed5b97bf2aa47bac613b5156e0d8771dab0c4abb4d7705",
+    "ifac_value": "ac613b5156e0d8771dab0c4abb4d7705",
+    "mask": "dcd39364b5e72baa2945c13d095496bfd867a68e3dea748fef6b1f1a225083006b94af11",
+    "masked_packet": "dcd2ac613b5156e0d8771dab0c4abb4d7705a48d39ef7288e7620f0b304397157d83b708"
+  },
+  "ifac_netname_only": {
+    "netname": "netonly",
+    "ifac_origin_hash": "4838f5729d3dc504ff20bedd10d8cfa602e6b8dace4916ee7241e91ac78e504b",
+    "ifac_key": "eda33cc717da202f17dedc2126b89e8baf6b617f17478d2be59c399e6a791fa4f1581c22bb6514a831a6ac78e1239e2e69234518ccaa63a404572a8e31ecddd8"
+  }
+}

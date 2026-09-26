@@ -1,0 +1,134 @@
+[package]
+name = "leviculum-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Reticulum network stack daemon (lnsd), test tool (lnstest), file-transfer client (lncp), status tool (lnstatus), and probe tool (lnprobe)"
+
+[[bin]]
+name = "lnsd"
+path = "src/lnsd.rs"
+
+[[bin]]
+name = "lnstest"
+path = "src/lnstest.rs"
+
+[[bin]]
+name = "lncp"
+path = "src/lncp.rs"
+
+[[bin]]
+name = "lnstatus"
+path = "src/lnstatus.rs"
+
+[[bin]]
+name = "lnprobe"
+path = "src/lnprobe.rs"
+
+[[bin]]
+name = "auto-crossmachine-test"
+path = "src/bin/auto_crossmachine_test.rs"
+
+[dependencies]
+leviculum-core = { path = "../leviculum-core", default-features = true }
+leviculum-std = { path = "../leviculum-std" }
+tokio.workspace = true
+tracing = { workspace = true, features = ["std"] }
+tracing-subscriber.workspace = true
+clap = { version = "4", features = ["derive"] }
+rand_core.workspace = true
+rmpv.workspace = true
+sha2.workspace = true
+serde_json = "1"
+# `lnstest diag` re-serialises the (secret-redacted) Config to TOML for the bundle.
+toml.workspace = true
+tempfile = "3"
+
+# `cargo deb -p leviculum-cli --target x86_64-unknown-linux-musl`
+# builds a .deb whose binaries are statically linked and therefore
+# run on any Debian ≥ 9 / Ubuntu ≥ 16.04 regardless of host glibc.
+# See packaging/debian/ for the systemd unit, default config, and
+# maintainer scripts.
+[package.metadata.deb]
+name = "leviculum"
+maintainer = "Lew Palm <lp@lew-palm.de>"
+copyright = "2025, Lew Palm"
+license-file = ["../LICENSE", "0"]
+extended-description = """\
+Leviculum is a Rust implementation of the Reticulum network stack,
+wire-compatible with the Python reference implementation.
+
+This package installs five binaries:
+  lnsd     — the Reticulum daemon (drop-in replacement for Python rnsd)
+  lnstest  — the test and diagnostics tool (selftest, diag, identity, connect)
+  lncp     — the file-transfer tool (drop-in for rncp)
+  lnstatus — the network status tool (drop-in for rnstatus)
+  lnprobe  — the reachability probe tool (drop-in for rnprobe)
+
+lnsd is configured as a systemd service running under a dedicated
+'leviculum' user, with its config directory at /etc/reticulum. Python
+Reticulum clients (rnstatus, rncp, Sideband, Nomadnet) detect this
+directory automatically via their standard /etc/reticulum lookup
+and connect to the shared-instance socket without extra flags.
+"""
+section = "net"
+priority = "optional"
+# The binaries are musl-static, so they have no NEEDED shared-library
+# deps for cargo-deb's `$auto` to discover. Declaring `$auto` here
+# would just emit a warning per binary on every build. adduser is the
+# only real runtime dependency (postinst calls it to create the
+# leviculum system user).
+depends = "adduser"
+assets = [
+    # cargo-deb only recognises "target/release/..." exactly as a Cargo
+    # target path and auto-substitutes the --target triple into it.
+    # Any prefix (e.g. "../") disables the rewrite and makes cargo-deb
+    # read the literal path, which silently picks up stale non-musl
+    # builds. Always use this form.
+    ["target/release/lnsd", "usr/bin/", "755"],
+    ["target/release/lnstest", "usr/bin/", "755"],
+    ["target/release/lncp", "usr/bin/", "755"],
+    ["target/release/lnstatus", "usr/bin/", "755"],
+    ["target/release/lnprobe", "usr/bin/", "755"],
+    # Source must NOT be named `config`, even though the destination is:
+    # `maintainer-scripts` below points at the same directory, and
+    # cargo-deb picks up a file named `config` there as the debconf
+    # pre-configuration script, shipping this TOML-ish file a second time
+    # as an executable control script.
+    ["../packaging/debian/reticulum-config", "etc/reticulum/config", "644"],
+    ["../README.md", "usr/share/doc/leviculum/README.md", "644"],
+    ["../CHANGELOG.md", "usr/share/doc/leviculum/CHANGELOG.md", "644"],
+    # Rendered from docs/src/man/ by scripts/md2man.py; see lblogd's
+    # manifest for why the Markdown under docs/ is the single source.
+    ["../target/man/lnsd.1", "usr/share/man/man1/lnsd.1", "644"],
+    ["../target/man/lnstest.1", "usr/share/man/man1/lnstest.1", "644"],
+    ["../target/man/lncp.1", "usr/share/man/man1/lncp.1", "644"],
+    ["../target/man/lnstatus.1", "usr/share/man/man1/lnstatus.1", "644"],
+    ["../target/man/lnprobe.1", "usr/share/man/man1/lnprobe.1", "644"],
+    # Documented overrides for the two lintian tags that a
+    # musl-static binary always trips; the file explains why each
+    # is a deliberate deviation rather than a defect.
+    ["../packaging/lintian/leviculum", "usr/share/lintian/overrides/leviculum", "644"],
+    # Codeberg #288. The binaries above are musl-static, so every MIT- and
+    # BSD-licensed crate is inside them rather than beside them, and both
+    # families require their copyright line and permission text to accompany
+    # a binary distribution. license-file above ships our AGPL and says
+    # nothing about them. Generated from Cargo.lock by scripts/gen-notices.py
+    # and kept honest by `just notices-guard` in Tier 0.
+    ["../THIRD-PARTY-NOTICES", "usr/share/doc/leviculum/THIRD-PARTY-NOTICES", "644"],
+]
+# Note: this is the *Debian* changelog, generated per build by
+# scripts/deb-stamp.sh. The project's own CHANGELOG.md ships separately
+# under usr/share/doc, above.
+changelog = "../target/deb-changelog/leviculum"
+maintainer-scripts = "../packaging/debian/"
+conf-files = ["/etc/reticulum/config"]
+
+[package.metadata.deb.systemd-units]
+unit-name = "lnsd"
+unit-scripts = "../packaging/debian/"
+enable = true
+start = true
+restart-after-upgrade = true

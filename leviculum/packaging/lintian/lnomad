@@ -1,0 +1,4 @@
+# musl-static binary; see packaging/lintian/lblogd for the reasoning
+# behind both overrides.
+lnomad: unstripped-binary-or-object [usr/bin/lnomad]
+lnomad: shared-library-lacks-prerequisites [usr/bin/lnomad]

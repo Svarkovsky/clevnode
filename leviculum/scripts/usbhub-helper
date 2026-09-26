@@ -1,0 +1,258 @@
+#!/bin/bash
+# usbhub-helper — per-device USB hub power switching for the leviculum CI
+# pipeline.  Lives at /usr/local/bin/usbhub-helper on hamster; invoked by
+# schneckenschreck via SSH ForceCommand.
+#
+# The five embedded devices that participate in nightly LoRa-hardware tests
+# are USB-passthrough'd from hamster into the schneckenschreck VM.  Tests
+# need to flip the corresponding hub ports on hamster between profiles.
+# Per-port-power-switching (uhubctl) works on every device except heltec-v4
+# (1-1.3.4 port 2): it stays enumerated regardless of port-power state, and
+# crucially has no battery, so the standard "self-powered USB device"
+# explanation does not apply.  Plausible alternatives (ESP32-S3 internal
+# cap reservoir, non-Vbus power path, etc.) are untested.  Until
+# investigated or the device is moved to a different hub branch,
+# `disable heltec-v4` is refused; the only ways to remove its power are
+# `disable-subhub` (kills Pocket V2 too) or physical unplug.
+#
+# Sudoers grants passwordless `/usr/sbin/uhubctl` to user `lew` via
+# /etc/sudoers.d/uhubctl.  This script is invoked under `lew` and shells
+# out via sudo for each uhubctl call.
+
+set -euo pipefail
+
+UHUBCTL=/usr/sbin/uhubctl
+
+# When invoked via SSH ForceCommand (`command="usbhub-helper $SSH_ORIGINAL_COMMAND"`
+# in authorized_keys), sshd runs us through the user's login shell.  Some
+# login shells (notably fish) do NOT word-split on variable expansion, so
+# `$SSH_ORIGINAL_COMMAND` arrives as a single positional argument like
+# "disable t-beam-1" instead of two args "disable" "t-beam-1".  Re-parse
+# from the env var using bash's own IFS-splitting (with globbing disabled,
+# so `enable *` won't expand against /etc), independent of the calling
+# shell.  Falls back to "$@" when not invoked via ssh.
+if [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
+    set -f
+    # shellcheck disable=SC2086
+    set -- $SSH_ORIGINAL_COMMAND
+    set +f
+fi
+
+DEVICE_KEYS=(t-beam-1 t-beam-2 pocket-v2 heltec-v4 t114)
+
+# device-key → hub
+device_hub() {
+    case "$1" in
+        t-beam-1)   echo "1-1.3" ;;
+        t-beam-2)   echo "1-1" ;;
+        pocket-v2)  echo "1-1.3.4" ;;
+        heltec-v4)  echo "1-1.3.4" ;;
+        t114)       echo "1-1.3" ;;
+        *)          return 1 ;;
+    esac
+}
+
+# device-key → port number on its hub
+device_port() {
+    case "$1" in
+        t-beam-1)   echo 3 ;;
+        t-beam-2)   echo 4 ;;
+        pocket-v2)  echo 1 ;;
+        heltec-v4)  echo 2 ;;
+        t114)       echo 2 ;;
+        *)          return 1 ;;
+    esac
+}
+
+die() {
+    echo "ERROR: $*" >&2
+    exit 1
+}
+
+# Read one port's power state from `uhubctl -l <hub>` output.
+# Echoes "on" or "off"; returns 1 if the port row is missing.
+port_state() {
+    local hub="$1" port="$2" line
+    line=$(sudo "$UHUBCTL" -l "$hub" 2>/dev/null | grep -E "^  Port $port:") || return 1
+    # uhubctl prints "0000 off" when the port is powered down, and
+    # "0100 power" / "0103 power highspeed ..." when on.  Match the leading
+    # space + "off" to avoid false positives on words like "offline".
+    if [[ "$line" =~ \ off($|[[:space:]]) ]]; then
+        echo off
+    else
+        echo on
+    fi
+}
+
+# Set one port's power state.  uhubctl -a: 0 = off, 1 = on.
+port_set() {
+    local hub="$1" port="$2" state="$3"
+    sudo "$UHUBCTL" -l "$hub" -p "$port" -a "$state" >/dev/null
+}
+
+do_enable() {
+    local key="$1" hub port
+    hub=$(device_hub "$key") || die "unknown device-key '$key'"
+    port=$(device_port "$key")
+    port_set "$hub" "$port" 1
+}
+
+do_disable() {
+    local key="$1"
+    if [[ "$key" == "heltec-v4" ]]; then
+        cat >&2 <<'EOF'
+ERROR: heltec-v4 has uncontrollable power (USB-PHY stays alive without
+external power; no battery installed, mechanism unknown).  Per-port
+disable is a no-op.  Workarounds:
+  * If pocket-v2 can also be disabled: usbhub-helper disable-subhub
+    (cuts 1-1.3.4 entirely; kills 1-1.3.4:1 and 1-1.3.4:2).
+  * Otherwise: physically unplug.  The pipeline cannot do this remotely.
+Aborting to avoid silent no-op.
+EOF
+        exit 1
+    fi
+    local hub port
+    hub=$(device_hub "$key") || die "unknown device-key '$key'"
+    port=$(device_port "$key")
+    port_set "$hub" "$port" 0
+}
+
+# JSON status object: device-key → state string.  Heltec V4 reflects the
+# parent sub-sub-hub power state (port 4 of hub 1-1.3) so a `disable-subhub`
+# is honestly reported as "off (via subhub)" rather than the misleading
+# "on (uncontrollable)".
+do_status() {
+    local first=1 key hub port state parent_state
+    printf '{'
+    for key in "${DEVICE_KEYS[@]}"; do
+        hub=$(device_hub "$key")
+        port=$(device_port "$key")
+        if [[ "$key" == "heltec-v4" ]]; then
+            parent_state=$(port_state "1-1.3" 4) || parent_state="unknown"
+            case "$parent_state" in
+                on)  state='on (uncontrollable)' ;;
+                off) state='off (via subhub)' ;;
+                *)   state='unknown' ;;
+            esac
+        else
+            state=$(port_state "$hub" "$port") || state="unknown"
+        fi
+        if [[ $first -eq 1 ]]; then first=0; else printf ', '; fi
+        printf '"%s": "%s"' "$key" "$state"
+    done
+    printf '}\n'
+}
+
+# Split a comma-separated key list into a bash array on stdout-by-eval.
+parse_key_list() {
+    local arg="$1"
+    PARSED_KEYS=()
+    IFS=',' read -ra PARSED_KEYS <<< "$arg"
+}
+
+do_enable_list() {
+    parse_key_list "$1"
+    local key
+    for key in "${PARSED_KEYS[@]}"; do do_enable "$key"; done
+}
+
+do_disable_list() {
+    parse_key_list "$1"
+    local key
+    for key in "${PARSED_KEYS[@]}"; do do_disable "$key"; done
+}
+
+# Sugar: turn off everything not in the wanted set, turn on everything in
+# it.  Heltec V4 in the wanted set is a no-op; in the unwanted set it
+# triggers a warning (since it cannot be disabled) but does not abort —
+# enable-only is meant for batch profile transitions.
+do_enable_only() {
+    parse_key_list "$1"
+    local key
+    declare -A wanted=()
+    for key in "${PARSED_KEYS[@]}"; do
+        if ! device_hub "$key" >/dev/null 2>&1; then
+            die "unknown device-key '$key'"
+        fi
+        wanted["$key"]=1
+    done
+    for key in "${DEVICE_KEYS[@]}"; do
+        if [[ -z "${wanted[$key]:-}" ]]; then
+            if [[ "$key" == "heltec-v4" ]]; then
+                echo "WARN: heltec-v4 cannot be disabled per-port; staying on" >&2
+            else
+                do_disable "$key"
+            fi
+        fi
+    done
+    for key in "${PARSED_KEYS[@]}"; do
+        do_enable "$key"
+    done
+}
+
+do_disable_subhub() {
+    sudo "$UHUBCTL" -l 1-1.3 -p 4 -a 0 >/dev/null
+}
+
+do_restore_default() {
+    # Re-enable the parent sub-sub-hub first so its child ports become
+    # controllable again.
+    sudo "$UHUBCTL" -l 1-1.3 -p 4 -a 1 >/dev/null
+    local key
+    for key in "${DEVICE_KEYS[@]}"; do
+        if [[ "$key" == "heltec-v4" ]]; then continue; fi
+        do_enable "$key"
+    done
+}
+
+usage() {
+    cat <<'EOF'
+Usage: usbhub-helper {status|enable|disable|enable-only|disable-subhub|restore-default} [args...]
+  status                              JSON: device-key → state
+  enable  <device-key>[,<key>,...]    power on one or more devices
+  disable <device-key>[,<key>,...]    power off (refuses heltec-v4)
+  enable-only <device-keys>           on for the listed, off for the rest
+  disable-subhub                      cut 1-1.3.4 entirely
+  restore-default                     subhub on, all controllable devices on
+EOF
+}
+
+main() {
+    if [[ $# -eq 0 ]]; then
+        echo "ERROR: missing subcommand." >&2
+        usage >&2
+        exit 1
+    fi
+    local cmd="$1"
+    shift
+    case "$cmd" in
+        status)
+            do_status
+            ;;
+        enable)
+            [[ $# -eq 1 ]] || die "usage: enable <device-key>[,<key>,...]"
+            do_enable_list "$1"
+            ;;
+        disable)
+            [[ $# -eq 1 ]] || die "usage: disable <device-key>[,<key>,...]"
+            do_disable_list "$1"
+            ;;
+        enable-only)
+            [[ $# -eq 1 ]] || die "usage: enable-only <device-keys>"
+            do_enable_only "$1"
+            ;;
+        disable-subhub)
+            do_disable_subhub
+            ;;
+        restore-default)
+            do_restore_default
+            ;;
+        *)
+            echo "ERROR: unknown subcommand '$cmd'." >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

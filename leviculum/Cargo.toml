@@ -1,0 +1,147 @@
+cargo-features = ["panic-immediate-abort"]
+[workspace]
+resolver = "2"
+members = [
+    "leviculum-core",
+    "leviculum-micron",
+    "lnomad",
+    "lblogd",
+    "leviculum-lxmf",
+    "leviculum-lxmf-node",
+    "leviculum-std",
+    "leviculum-ffi",
+    "leviculum-cli",
+    "leviculum-proxy",
+    "lnflash",
+    "lnmsg",
+    "vectors-verify",
+]
+
+# leviculum-ffi is a gnu-target cdylib (built via the `build-ffi` alias). It is
+# excluded from the default musl build (default target per .cargo/config.toml)
+# because cdylib is unsupported on musl, which otherwise emits
+# `warning: dropping unsupported crate type cdylib` on a bare build. It stays a
+# member so `-p leviculum-ffi`, `--workspace`, and `build-ffi` still work.
+default-members = [
+    "leviculum-core",
+    "leviculum-micron",
+    "lnomad",
+    "lblogd",
+    "leviculum-lxmf-node",
+    "leviculum-std",
+    "leviculum-cli",
+    "leviculum-proxy",
+    "lnflash",
+    "lnmsg",
+    "vectors-verify",
+]
+
+# leviculum-nrf requires cross-compilation (thumbv7em-none-eabihf) and
+# cannot build with --workspace on the host.
+# Build with: cargo build -p leviculum-nrf --target thumbv7em-none-eabihf
+exclude = ["leviculum-nrf", "vendor/crossterm"]
+
+# Vendored, minimally-patched crossterm 0.29.0. The patch exposes mouse side
+# buttons (X buttons 8/9) as MouseButton::Back / MouseButton::Forward, which
+# upstream crossterm swallows in parse_cb. Both lnomad and ratatui-crossterm
+# resolve to crossterm 0.29.0, so this replaces it everywhere.
+[patch.crates-io]
+crossterm = { path = "vendor/crossterm" }
+
+[workspace.package]
+version = "0.8.1"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+repository = "https://codeberg.org/Lew_Palm/leviculum"
+homepage = "https://codeberg.org/Lew_Palm/leviculum"
+description = "Rust implementation of the Reticulum network stack"
+
+[workspace.dependencies]
+# Core crypto dependencies (no_std compatible)
+curve25519-dalek = { version = "4", default-features = false, features = ["alloc", "zeroize"] }
+ed25519-dalek = { version = "2", default-features = false, features = ["alloc", "zeroize"] }
+x25519-dalek = { version = "2", default-features = false, features = ["static_secrets", "zeroize"] }
+aes = { version = "0.8", default-features = false }
+cbc = { version = "0.1", default-features = false, features = ["alloc"] }
+sha2 = { version = "0.10", default-features = false }
+hmac = { version = "0.12", default-features = false }
+md-5 = { version = "0.10" }
+hkdf = { version = "0.12", default-features = false }
+rand_core = { version = "0.6", default-features = false }
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
+# MessagePack wire primitives for the no_std + alloc LXMF codec.
+rmp = { version = "0.8.15", default-features = false }
+
+# std dependencies
+tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "net", "time", "sync", "macros", "process", "fs", "io-util"] }
+tokio-serial = "5"
+tracing = { version = "0.1", default-features = false, features = ["release_max_level_info"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1", features = ["derive"] }
+rmp-serde = "1"
+rmpv = "1"
+serde-pickle = "1"
+toml = "0.8"
+thiserror = "2"
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+bytes = "1"
+
+# Compression (no_std compatible)
+libbz2-rs-sys = { version = "0.2", default-features = false, features = ["rust-allocator"] }
+
+# Networking
+if-addrs = { version = "0.15", features = ["link-local"] }
+socket2 = { version = "0.6", features = ["all"] }
+
+# BLE (Columba mesh interface in leviculum-std). bluer is the official BlueZ
+# Rust binding; it speaks D-Bus through the libdbus-based `dbus` crate, whose
+# `vendored` feature compiles libdbus from source so the musl-static default
+# target keeps producing self-contained binaries (the same reason rustls-acme
+# rides on ring above).
+bluer = { version = "0.17", default-features = false, features = ["bluetoothd"] }
+dbus = { version = "0.9", features = ["vendored"] }
+
+# Web server (lblogd clearnet side). rustls-acme runs on ring instead of its
+# aws-lc-rs default: ring cross-builds cleanly for the musl-static default
+# target without a cmake toolchain.
+axum = "0.8"
+axum-server = "0.8"
+rustls-acme = { version = "0.15", default-features = false, features = ["ring", "tls12", "webpki-roots", "axum"] }
+futures = "0.3"
+tower = { version = "0.5", features = ["util"] }
+# Filesystem watching for lblogd's optional posts auto-reload. Version 8 is
+# the stable line; 9 is still a release candidate.
+notify = "8"
+
+# FFI
+libc = "0.2"
+
+# Testing
+proptest = "1"
+
+# Crypto libs are unusably slow without optimizations (constant-time field
+# arithmetic, scalar multiplication). Build them at max opt even in debug.
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+[profile.dev.package.ed25519-dalek]
+opt-level = 3
+[profile.dev.package.x25519-dalek]
+opt-level = 3
+
+# Strip debug info (not symbols) at link time. Rustc passes the right
+# flags per target, which avoids the post-link `strip --strip-all` that
+# cargo-deb runs by default — that one corrupted x86_64 musl-static
+# binaries (segfault at startup, see commit history). "debuginfo" keeps
+# the symbol table, so panic backtraces still show function names.
+# .deb builds pair this with `cargo deb --no-strip` in
+# .woodpecker/nightly.yml so cargo-deb's strip is skipped entirely.
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "immediate-abort"
+strip = true
+debug = false
+debug-assertions = false
+overflow-checks = false

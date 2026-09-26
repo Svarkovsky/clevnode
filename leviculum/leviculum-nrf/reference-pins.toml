@@ -1,0 +1,66 @@
+# Upstream pin numbers for the sets that fail silently when they are wrong.
+#
+# Read by `scripts/check-nrf-board-pins.sh`. Every number here is a fact
+# copied out of a Meshtastic variant header, with the `define` that carries
+# it named next to it, so the gate can re-derive the table from that header
+# whenever the tree is present and check it against ours when it is not.
+#
+# `pin` is the nRF52840 GPIO ordinal that the variant headers use:
+# 0..31 is P0.n, 32..63 is P1.(n-32).
+#
+# Only the QSPI and LoRa sets are recorded, because only those two are
+# defined upstream under stable names for both boards AND fail without
+# saying so: a wrong QSPI line reads `id=00:00:00`, a wrong LoRa line is a
+# radio that never answers. The rest of each board's map is left out on
+# purpose — the GPS pins are named from the module's side upstream
+# (`GPS_RX_PIN` is our TX), the T114 UART is on repurposed NFC pins that
+# have no upstream define at all, and the RAK's display/I2C pins depend on
+# the baseboard rather than the module. Those would need a per-pin rule,
+# and a table of exceptions does not gate anything.
+
+[boards.t114]
+board = "leviculum-nrf/src/boards/t114.rs"
+bin = "leviculum-nrf/src/bin/t114.rs"
+variant = "variants/nrf52840/heltec_mesh_node_t114/variant.h"
+
+[boards.t114.qspi]
+sck = { pin = 46, alias = "QspiClk", define = "PIN_QSPI_SCK" }
+cs = { pin = 47, alias = "QspiCs", define = "PIN_QSPI_CS" }
+io0 = { pin = 44, alias = "QspiIo0", define = "PIN_QSPI_IO0" }
+io1 = { pin = 45, alias = "QspiIo1", define = "PIN_QSPI_IO1" }
+io2 = { pin = 7, alias = "QspiIo2", define = "PIN_QSPI_IO2" }
+io3 = { pin = 5, alias = "QspiIo3", define = "PIN_QSPI_IO3" }
+
+[boards.t114.lora]
+sck = { pin = 19, alias = "LoRaSck", define = "PIN_SPI_SCK" }
+mosi = { pin = 22, alias = "LoRaMosi", define = "PIN_SPI_MOSI" }
+miso = { pin = 23, alias = "LoRaMiso", define = "PIN_SPI_MISO" }
+cs = { pin = 24, alias = "LoRaCs", define = "SX126X_CS" }
+reset = { pin = 25, alias = "LoRaReset", define = "SX126X_RESET" }
+busy = { pin = 17, alias = "LoRaBusy", define = "SX126X_BUSY" }
+dio1 = { pin = 20, alias = "LoRaDio1", define = "SX126X_DIO1" }
+
+[boards.rak4631]
+board = "leviculum-nrf/src/boards/rak4631.rs"
+bin = "leviculum-nrf/src/bin/rak4631.rs"
+variant = "variants/nrf52840/rak4631/variant.h"
+
+[boards.rak4631.qspi]
+sck = { pin = 3, alias = "QspiClk", define = "PIN_QSPI_SCK" }
+cs = { pin = 26, alias = "QspiCs", define = "PIN_QSPI_CS" }
+io0 = { pin = 30, alias = "QspiIo0", define = "PIN_QSPI_IO0" }
+io1 = { pin = 29, alias = "QspiIo1", define = "PIN_QSPI_IO1" }
+io2 = { pin = 28, alias = "QspiIo2", define = "PIN_QSPI_IO2" }
+io3 = { pin = 2, alias = "QspiIo3", define = "PIN_QSPI_IO3" }
+
+[boards.rak4631.lora]
+sck = { pin = 43, alias = "LoRaSck", define = "PIN_SPI_SCK" }
+mosi = { pin = 44, alias = "LoRaMosi", define = "PIN_SPI_MOSI" }
+miso = { pin = 45, alias = "LoRaMiso", define = "PIN_SPI_MISO" }
+cs = { pin = 42, alias = "LoRaCs", define = "SX126X_CS" }
+reset = { pin = 38, alias = "LoRaReset", define = "SX126X_RESET" }
+busy = { pin = 46, alias = "LoRaBusy", define = "SX126X_BUSY" }
+dio1 = { pin = 47, alias = "LoRaDio1", define = "SX126X_DIO1" }
+# Not an argument of `lora::init`; the alias is the only user, and the
+# module is dead without it, so it is checked against the alias alone.
+power_en = { pin = 37, alias = "LoRaPowerEn", define = "SX126X_POWER_EN", call_site = false }

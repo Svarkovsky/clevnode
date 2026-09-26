@@ -1,0 +1,23 @@
+/// The Rust half of the figure-attribution canary.
+///
+/// This paragraph attributes its numbers to
+/// `docs/src/concepts/canary_budget.md`. The page names 3.2 ms, which must
+/// pass. It does not name 126.6 ms, which must be reported: that is the
+/// #200 defect, spelled the way it was actually written -- the attribution
+/// in one sentence, the unsupported figure two sentences later, so a
+/// sentence-scoped trigger would let it through. 5 ms therefore sits above
+/// what the page calls acceptable and ~25x below the defect, and neither of
+/// those is a decimal, so neither may be checked or the guard reports the
+/// constant's own value as unattributed.
+pub const CANARY_BUDGET_MS: u64 = 5;
+
+/// A paragraph naming the same page and quoting only the version string
+/// 0.8.0, which must not be read as the figure 0.8 and must not be
+/// reported.
+pub const CANARY_VERSION: &str = "0.8.0";
+
+/// A paragraph attributing 1.5 ms to `docs/src/concepts/canary_gone.md`,
+/// which is not in the fixture tree. Must be reported as missing rather
+/// than silently skipped: a renamed page would otherwise switch the check
+/// off for every comment that cites it.
+pub const CANARY_ORPHAN_MS: u64 = 2;

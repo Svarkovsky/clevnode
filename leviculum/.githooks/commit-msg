@@ -1,0 +1,18 @@
+#!/bin/bash
+# Reject a machine-authorship trailer at commit time (Codeberg #205).
+#
+# The only commit-msg hook this repository has. Until 2026-08-07 there was a
+# second one, uncommitted, in .git/hooks/: it *stripped* the trailer instead
+# of refusing it, and only it knew that foreign commit messages are left
+# verbatim (policy 2026-06-13). Two scripts, two behaviours, and the
+# disagreement was invisible until a foreign commit arrived -- which is
+# exactly when it bit. Rejecting won, and the author exemption moved into
+# check-commit-trailers.sh where the pushed-range check can honour it too:
+# one rule, one implementation, both callers.
+#
+# Convenience, not enforcement. A fresh clone has no hooks until
+# `scripts/install-ci.sh` sets core.hooksPath, and `--no-verify` skips the
+# ones it has. The enforcement is the woodpecker check on the pushed range,
+# which nobody can forget to install. This exists so the failure arrives
+# while the message is still in the editor rather than after a push.
+exec bash "$(git rev-parse --show-toplevel)/scripts/check-commit-trailers.sh" --message "$1"

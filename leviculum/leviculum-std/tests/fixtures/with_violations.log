@@ -1,0 +1,12 @@
+PKT_RX node=alpha dst=abc1 hops=0 iface=lora0 type=Data t=10
+EVENT_SCHEMA_VIOLATION event=PKT_RX missing=[len] caller=transport.rs:1049 t=10
+ANN_RX node=alpha dst=abc1 hops=0 iface=lora0 path_response=false t=20
+PATH_ADD node=alpha dst=abc1 hops=0 iface=lora0 next_hop=alpha ok=true source=announce table_len=1 t=21
+PKT_RX node=alpha dst=abc2 hops=0 iface=lora0 len=64 type=Data note=has_whitespace t=50
+EVENT_FIELD_VIOLATION event=PKT_RX field=note value_problem=whitespace caller=transport.rs:1049 t=50
+PKT_LOCAL node=alpha dst=abc1 iface=lora0 matched=true t=80
+PKT_DROP node=alpha dst=abc3 hops=3 iface_in=lora0 reason=ttl_expired t=120
+EVENT_SCHEMA_VIOLATION event=PKT_DROP missing=[type] caller=transport.rs:2812 t=120
+PKT_RX node=alpha dst=abc4 hops=0 iface=tcp1 len=128 type=Data t=160
+PKT_FORWARD node=alpha dst=abc4 hops=1 iface_in=tcp1 iface_out=lora0 next_hop=beta type=Data t=162
+ANN_RX node=alpha dst=abc5 hops=1 iface=tcp1 path_response=true t=200

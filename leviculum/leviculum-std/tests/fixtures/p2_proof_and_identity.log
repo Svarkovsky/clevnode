@@ -1,0 +1,17 @@
+IDENTITY node=alpha node=deadbeef00112233445566778899aabb t=10
+PKT_RX node=alpha dst=abc1 hops=0 iface=lora0 len=64 type=Data t=20
+PROOF_GEN node=alpha for_pkt=cafebabe to_dst=abc1 t=21
+PROOF_SEND node=alpha iface=lora0 pkt=cafebabe t=22
+PKT_RX node=alpha dst=abc2 hops=1 iface=tcp1 len=128 type=Data t=80
+PROOF_GEN node=alpha for_pkt=12345678 to_dst=abc2 t=81
+PROOF_SEND node=alpha iface=tcp1 pkt=12345678 t=82
+PATH_LOOKUP node=alpha dst=abc3 found=false t=120
+PATH_LOOKUP node=alpha dst=abc1 found=true hops=0 iface=lora0 t=130
+PATH_TABLE node=alpha size=2 t=200
+PATH_TABLE_ENTRY node=alpha dst=abc1 expires_in_ms=8000 hops=0 iface=lora0 next_hop=alpha t=201
+PATH_TABLE_ENTRY node=alpha dst=abc2 expires_in_ms=7500 hops=1 iface=tcp1 next_hop=beta t=202
+REVERSE_ADD node=alpha in_iface=tcp1 out_iface=lora0 pkt_hash=12345678 t=302
+EMB_EVICT node=alpha cap=32 len_before=32 map=destinations t=400
+EMB_INSERT_FAIL node=alpha cap=32 len_after_evict=10 map=paths t=401
+PROOF_GEN node=alpha for_pkt=77777777 to_dst=abc4 t=500
+PROOF_SEND node=alpha iface=lora0 pkt=77777777 t=501

@@ -1,0 +1,33 @@
+#!/bin/sh
+# postrm for lblogd — on purge, remove the data directory and the system
+# user/group. `config.toml` under /etc/lblogd is a conffile and handled
+# by dpkg's conffile machinery.
+
+set -e
+
+case "$1" in
+    purge)
+        # This destroys the node identity along with the posts, so the
+        # blog's mesh address does not survive a purge. That is what
+        # purge means; `apt remove` without --purge leaves it all intact.
+        rm -rf /var/lib/lblogd
+
+        if [ -d /etc/lblogd ]; then
+            rmdir --ignore-fail-on-non-empty /etc/lblogd
+        fi
+
+        if getent passwd lblogd >/dev/null; then
+            deluser --quiet --system lblogd >/dev/null 2>&1 || true
+        fi
+        if getent group lblogd >/dev/null; then
+            delgroup --quiet --system lblogd >/dev/null 2>&1 || true
+        fi
+        ;;
+
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

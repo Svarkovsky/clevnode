@@ -1,0 +1,26 @@
+# Reticulum configuration for clevnode (INI format)
+# Reference: https://reticulum.network/manual/interfaces.html
+
+[reticulum]
+enable_transport = yes
+share_instance = yes
+shared_instance_port = 37428
+flush_interval = 900
+
+[logging]
+loglevel = 1
+
+[interfaces]
+  [[Local Wi-Fi Server]]
+    type = TCPServerInterface
+    enabled = yes
+    listen_ip = 0.0.0.0
+    listen_port = 4242
+
+  [[WDGWars Node]]
+    type = TCPClientInterface
+    enabled = yes
+    target_host = rns.wdgwars.pl
+    target_port = 4242
+    bootstrap_only = yes
+    name = WDGWars Node

@@ -1,0 +1,7 @@
+[Unit]
+Description=Leviculum CI Tier 2 (extensive)
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/coding/libreticulum
+ExecStart=/bin/bash %h/coding/libreticulum/scripts/run-tier2.sh

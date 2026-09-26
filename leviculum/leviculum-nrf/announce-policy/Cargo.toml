@@ -1,0 +1,9 @@
+[package]
+name = "leviculum-announce-policy"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Pure announce cadence and per-peer rate limit for both leviculum stacks, host-testable"
+
+[dependencies]

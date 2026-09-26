@@ -1,0 +1,141 @@
+#!/bin/bash
+set -e
+
+# --- ref guard: only master and tags reach a public remote -------------------
+# "Only master goes to Codeberg; feature branches move host-to-host over SSH"
+# was model memory until 2026-08-17 (review PROC-0006). A stray branch on a
+# public forge is published the moment it lands and cannot be retracted, so
+# the rule belongs in a mechanism. Runs FIRST: a refusal must not cost the
+# multi-minute lint+fast below.
+#
+# git passes the remote name as $1 and its URL as $2, and one line per ref on
+# stdin: <local ref> <local sha> <remote ref> <remote sha>. stdin can be read
+# exactly once and both guards below need those lines, so slurp them here and
+# feed each guard from the variable (a here-string, not a pipe: a `while` on
+# the right of a pipe runs in a subshell, where `exit 1` refuses nothing).
+prepush_refs="$(cat)"
+ref_guard_remote="${1:-}"
+ref_guard_url="${2:-}"
+prepush_public=false
+if [ "$ref_guard_remote" = "origin" ] || printf '%s' "$ref_guard_url" | grep -qi 'codeberg\.org'; then
+    prepush_public=true
+fi
+
+if [ "$prepush_public" = true ]; then
+    while read -r _local_ref local_sha remote_ref _remote_sha; do
+        [ -z "$remote_ref" ] && continue
+        # An all-zero local sha is a branch DELETION — removing a stray branch
+        # from the forge must stay possible, that is the remedy, not the harm.
+        case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+        case "$remote_ref" in
+            refs/heads/master) ;;
+            refs/tags/*) ;;
+            refs/heads/*)
+                echo "pre-push: REFUSED — '$remote_ref' is not master." >&2
+                # (guard-only mode, below, lets the selftest exercise every
+                #  branch of this decision without the multi-minute gates)
+                echo "pre-push: only master and tags go to $ref_guard_remote (public forge)." >&2
+                echo "pre-push: move feature branches host-to-host instead, e.g." >&2
+                echo "pre-push:   git -C <other-host-tree> fetch ssh://<host>/<path> <branch>:<branch>" >&2
+                exit 1
+                ;;
+        esac
+    done <<< "$prepush_refs"
+fi
+
+# --- Claude guard: Claude-specific files never reach a public remote ---------
+# Second, independent layer under the same rule as `.gitignore`'s `.claude/`
+# entry, because an ignore rule is advisory: `git add -f` defeats it, and by
+# then the file is a committed object that only this hook still sees. What is
+# published cannot be retracted, so this runs BEFORE the expensive gates too.
+#
+# The commits being pushed are judged, not the working tree: a file staged
+# weeks ago is exactly the case an ignore rule already failed to stop.
+#
+# Public remote only. Host-to-host pushes between hamster and schneckenschreck
+# are how these files are legitimately moved between machines, so they pass —
+# same carve-out the ref guard makes.
+if [ "$prepush_public" = true ]; then
+    while read -r _local_ref local_sha remote_ref remote_sha; do
+        [ -z "$remote_ref" ] && continue
+        # Deletion: no content is being published, nothing to inspect.
+        case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+        # An all-zero remote sha is a ref the forge does not have yet, so there
+        # is no base to diff against — take the commits that no remote-tracking
+        # ref contains, which is what this push actually adds.
+        case "$remote_sha" in
+            *[!0]*) claude_range=("$remote_sha..$local_sha") ;;
+            *)      claude_range=("$local_sha" --not --remotes) ;;
+        esac
+        # --no-renames so a rename lists both names: renaming CLAUDE.md into
+        # place must trip the guard just as adding it does.
+        #
+        # CLAUDE.md is matched by BASENAME PREFIX, not exact name: an editor
+        # swap file (CLAUDE.md~), a merge leftover (CLAUDE.md.orig) or a copy
+        # (CLAUDE.md.bak-mirror) holds the same policy text, and the exact-name
+        # test let such a commit through to the public remote with exit 0
+        # (measured 2026-08-17). The `(^|/)` prefix anchor is what keeps the
+        # widening honest: only a path COMPONENT that begins with the name
+        # matches, so an ordinary file that merely mentions it later in a
+        # component — docs/how-we-use-CLAUDE.md-files.txt, src/claude_adapter.rs
+        # — still passes. A file truly named `CLAUDE.md<suffix>` is refused;
+        # that spelling is far more often a leaked copy than a wanted source
+        # file, and the remedy for the rare exception is a rename.
+        claude_hits="$(git -c core.quotepath=false log --format= --name-only \
+            --no-renames "${claude_range[@]}" -- \
+            | grep -Ei '(^|/)CLAUDE\.md|(^|/)\.mcp\.json$|(^|/)\.claude/' \
+            | sort -u || true)"
+        if [ -n "$claude_hits" ]; then
+            echo "pre-push: REFUSED — '$remote_ref' carries Claude-specific files:" >&2
+            printf '%s\n' "$claude_hits" | sed 's|^|pre-push:   |' >&2
+            echo "pre-push: these never go to $ref_guard_remote (public forge)." >&2
+            echo "pre-push: they move host-to-host instead, e.g." >&2
+            echo "pre-push:   git -C <other-host-tree> fetch ssh://<host>/<path> <branch>:<branch>" >&2
+            echo "pre-push: if one is already committed, rewrite it out of the range first." >&2
+            exit 1
+        fi
+    done <<< "$prepush_refs"
+fi
+
+# Testability affordance: the guards above are the only part of this hook a
+# selftest can exercise cheaply — everything below costs minutes. With
+# LEV_PREPUSH_GUARD_ONLY=1 the hook stops here, so `lev-selftest` can assert
+# all six ref-guard outcomes (refuse / master / tag / delete / other-remote /
+# multi-ref) in under a second. It is a test hook, never set in normal use.
+[ "${LEV_PREPUSH_GUARD_ONLY:-0}" = "1" ] && exit 0
+
+# git runs hooks with the login shell's PATH, not an interactive one, so
+# ~/.local/bin — where woodpecker-cli is installed — is absent and the bare
+# name resolved to nothing. Prepend it, then resolve the name explicitly:
+# `command -v` failing is a different fact from the lint failing, and the
+# hook should say which one happened. Not an absolute path, because the
+# install location is per-machine and a wrong one here is a hook every
+# clone has to edit.
+export PATH="$HOME/.local/bin:$PATH"
+if ! command -v woodpecker-cli >/dev/null 2>&1; then
+    echo "pre-push: woodpecker-cli not found on PATH (looked in ~/.local/bin)." >&2
+    echo "pre-push: install it from https://codeberg.org/woodpecker/woodpecker" >&2
+    echo "pre-push: or set PATH so this hook can see it, then push again." >&2
+    exit 1
+fi
+
+# Lint Woodpecker pipelines first — schema-check is sub-second, so
+# bailing here saves the multi-minute Tier 0 below if a YAML is broken.
+woodpecker-cli lint .woodpecker/
+
+# Always run Tier 0 fast checks (transitively pulls in mvr)
+just fast
+
+# Record Tier 0 + mvr pass in results log (mvr is fast's dep)
+mkdir -p ~/.local/state/leviculum-ci
+echo "$(date -Iseconds) tier0+mvr GREEN" >> ~/.local/state/leviculum-ci/last-results.txt
+
+# There was a Tier 2 staleness gate here until 2026-08-07. It blocked on a
+# `tier2 GREEN` line that only scripts/run-tier2.sh writes, and nothing has
+# run that script since the 12:30/18:30 timer was retired (install-ci.sh
+# step 9, 2026-06-12). Last such line: 2026-06-22. The remedy it printed —
+# `just extensive` — does not write the line either, so the block could not
+# be cleared by doing what it said, and 502 commits reached master through
+# `--no-verify`, which switches off this whole hook. Removed rather than
+# repaired: an unsatisfiable gate does not merely fail to protect, it
+# teaches everyone to disable the gates that work.

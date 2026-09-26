@@ -1,0 +1,37 @@
+[package]
+name = "lnflash"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Self-contained flasher for LNode boards — identifies a board from its bootloader, checks preconditions, and writes our firmware over UF2 mass storage"
+
+[dependencies]
+# The radio-configuration frame and its HDLC framing. There is one wire
+# format for this and `lnsd` already speaks it; a second copy here would be
+# the copy that drifts. No feature of it is used at run time beyond those two
+# modules, so the default `tracing` feature stays off and the bundle keeps
+# its "one static binary, no dependencies" property.
+leviculum-core = { path = "../leviculum-core", default-features = false }
+# The manifest is the only configuration surface, and it is declarative
+# data by design (docs/src/concepts/lnode-flashing.md, "Deliberately not").
+serde = { workspace = true }
+toml = { workspace = true }
+# Payload checksums. Nothing here is a security boundary — the bundle is
+# handed over as a unit — but a truncated download must not reach flash.
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+# termios for the 1200-baud touch, mount(2) for the bootloader drive: "no
+# external programs" means syscalls, not stty and mount(8).
+libc = { workspace = true }
+# Scratch mount point for the bootloader drive, and bundle fixtures in tests.
+tempfile = "3"
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "lnflash"
+path = "src/main.rs"

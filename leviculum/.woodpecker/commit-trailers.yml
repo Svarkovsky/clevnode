@@ -1,0 +1,37 @@
+# Commit-message authorship guard (Codeberg #205).
+#
+# CONTRIBUTING.md forbids AI trailers. This is what stands behind that
+# sentence. It is a forge check rather than a git hook on purpose: a fresh
+# clone has no hooks, `--no-verify` skips the ones it has, and the rule is
+# being enforced against a tooling *default* that pushes the other way, so
+# the only version of it that survives is one nobody has to install.
+#
+# `.githooks/commit-msg` runs the same script at commit time. That is
+# convenience. This is the check.
+#
+# Cheap by construction: no build, no cargo, no submodules -- one `git log`
+# over the range and one `awk`. It is deliberately its own pipeline file so
+# that a failure here is legible on its own and cannot be lost inside a
+# multi-minute build's output.
+when:
+  - event: [push, pull_request, manual]
+
+# `partial: false` is load-bearing. The guard checks every commit since a
+# pinned baseline, and a partial or shallow clone that stops short of it has
+# no range to check. The script deepens what it can and fails closed on what
+# it cannot, but it should not have to.
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      partial: false
+      recursive: false
+      submodules: false
+
+steps:
+  commit-trailers:
+    # A debian-based image the runner already pulls for the nightly, for
+    # bash + git + awk and nothing else.
+    image: rust:bookworm
+    commands:
+      - bash scripts/check-commit-trailers.sh

@@ -1,0 +1,12 @@
+[package]
+name = "leviculum-micron"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Micron (.mu) markup parser producing a render-agnostic document model"
+
+[lints.rust]
+unsafe_code = "forbid"

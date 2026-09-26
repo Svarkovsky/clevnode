@@ -1,0 +1,33 @@
+[package]
+name = "leviculum-ffi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "C-API/FFI bindings for reticulum"
+
+[lib]
+# Output libleviculum.so / libleviculum.a so the link flag is -lleviculum.
+# rlib is added so the Rust test suites can link the crate and call the lev_*
+# functions directly; it is an extra artifact and does not affect the shipped
+# cdylib/staticlib.
+name = "leviculum"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+leviculum-std = { path = "../leviculum-std" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+libc = { workspace = true }
+rand_core = { version = "0.6", features = ["std", "getrandom"] }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1"
+tempfile = "3"
+hex = "0.4"
+proptest = "1"
+
+[build-dependencies]
+cbindgen = "0.27"

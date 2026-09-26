@@ -1,0 +1,10 @@
+[package]
+name = "leviculum-gnss-time"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lew Palm"]
+license = "AGPL-3.0-or-later"
+description = "Pure NMEA-UTC-to-unix conversion and seed-once policy for leviculum-nrf, host-testable"
+
+[dependencies]
+nmea0183 = { version = "0.6", default-features = false }

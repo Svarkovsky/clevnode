@@ -1,0 +1,13 @@
+[submodule "vendor/Reticulum"]
+	path = reference/Reticulum
+	url = https://github.com/reallew/Reticulum.git
+	branch = libreticulum-patches
+[submodule "vendor/RNode_Firmware"]
+	path = reference/RNode_Firmware
+	url = https://github.com/markqvist/RNode_Firmware.git
+[submodule "vendor/LXMF"]
+	path = reference/LXMF
+	url = https://github.com/markqvist/LXMF.git
+[submodule "vendor/LXST"]
+	path = reference/LXST
+	url = https://github.com/markqvist/LXST.git

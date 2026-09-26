@@ -1,0 +1,47 @@
+[Unit]
+Description=Leviculum / Reticulum Network Stack Daemon
+Documentation=https://codeberg.org/Lew_Palm/leviculum
+After=network.target
+Wants=network.target
+
+# Give up after ten failed starts in five minutes instead of retrying for
+# ever. With RestartSec=5 below, systemd's defaults (5 starts per 10 s)
+# can never be reached, so a permanently impossible start — a taken
+# shared-instance name, an unparsable config — used to flap silently at
+# 5-second intervals for the life of the machine. A service that lands in
+# `failed` is one an operator finds; one that flaps forever is not.
+# The window is still wide enough to ride out a transient cause, such as
+# an interface whose address is not up yet at boot.
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=leviculum
+Group=leviculum
+ExecStart=/usr/bin/lnsd -c /etc/reticulum
+Restart=on-failure
+RestartSec=5
+
+# Socket + storage files created by the daemon are owned leviculum:leviculum
+# with mode 0660 / dir 0770 — only members of the `leviculum` group can
+# reach the shared-instance socket.
+UMask=0007
+
+# Hardening: read-only filesystem except the config/state directory.
+ProtectSystem=strict
+ReadWritePaths=/etc/reticulum
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

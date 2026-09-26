@@ -1,0 +1,51 @@
+ANN_RX node=alpha dst=abc1 hops=0 iface=lora0 path_response=false t=10
+PATH_ADD node=alpha dst=abc1 hops=0 iface=lora0 next_hop=alpha ok=true source=announce table_len=1 t=11
+ANN_RX node=beta dst=abc1 hops=1 iface=lora0 path_response=false t=15
+PATH_ADD node=beta dst=abc1 hops=1 iface=lora0 next_hop=alpha ok=true source=announce table_len=1 t=16
+ANN_RX node=gamma dst=abc1 hops=2 iface=lora0 path_response=false t=18
+PATH_ADD node=gamma dst=abc1 hops=2 iface=lora0 next_hop=beta ok=true source=announce table_len=1 t=19
+PKT_RX node=alpha dst=abc1 hops=0 iface=lora0 len=64 type=Announce t=10
+PKT_RX node=beta dst=abc1 hops=1 iface=lora0 len=64 type=Announce t=15
+PKT_RX node=gamma dst=abc1 hops=2 iface=lora0 len=64 type=Announce t=18
+ANN_RX node=alpha dst=abc2 hops=0 iface=tcp1 path_response=false t=30
+PATH_ADD node=alpha dst=abc2 hops=0 iface=tcp1 next_hop=delta ok=true source=announce table_len=2 t=31
+ANN_RX node=beta dst=abc2 hops=1 iface=lora0 path_response=false t=35
+PATH_ADD node=beta dst=abc2 hops=1 iface=lora0 next_hop=alpha ok=true source=announce table_len=2 t=36
+PKT_RX node=alpha dst=abc2 hops=0 iface=tcp1 len=72 type=Announce t=30
+PKT_RX node=beta dst=abc2 hops=1 iface=lora0 len=72 type=Announce t=35
+PKT_RX node=gamma dst=abc2 hops=2 iface=lora0 len=72 type=Announce t=38
+PATH_ADD node=gamma dst=abc2 hops=2 iface=lora0 next_hop=beta ok=true source=announce table_len=2 t=39
+PKT_LOCAL node=alpha dst=abc1 iface=lora0 matched=true t=50
+PKT_LOCAL node=beta dst=abc1 iface=lora0 matched=true t=55
+PKT_LOCAL node=gamma dst=abc1 iface=lora0 matched=true t=58
+PKT_RX node=alpha dst=abc3 hops=1 iface=tcp1 len=128 type=Data t=80
+PKT_FORWARD node=alpha dst=abc3 hops=1 iface_in=tcp1 iface_out=lora0 next_hop=beta type=Data t=82
+PKT_RX node=beta dst=abc3 hops=2 iface=lora0 len=128 type=Data t=85
+PKT_FORWARD node=beta dst=abc3 hops=2 iface_in=lora0 iface_out=lora0 next_hop=gamma type=Data t=87
+PKT_RX node=gamma dst=abc3 hops=3 iface=lora0 len=128 type=Data t=90
+PKT_DROP node=gamma dst=abc3 hops=4 iface_in=lora0 reason=ttl_expired type=Data t=92
+PKT_RX node=alpha dst=abc4 hops=0 iface=lora0 len=200 type=Data t=120
+PKT_LOCAL node=alpha dst=abc4 iface=lora0 matched=true t=121
+PKT_RX node=beta dst=abc5 hops=1 iface=tcp1 len=64 type=Data t=140
+PKT_FORWARD node=beta dst=abc5 hops=1 iface_in=tcp1 iface_out=lora0 next_hop=alpha type=Data t=142
+PKT_RX node=alpha dst=abc5 hops=2 iface=lora0 len=64 type=Data t=145
+PKT_LOCAL node=alpha dst=abc5 iface=lora0 matched=true t=146
+PKT_RX node=gamma dst=abc6 hops=1 iface=lora0 len=160 type=Data t=170
+PKT_FORWARD node=gamma dst=abc6 hops=1 iface_in=lora0 iface_out=lora0 next_hop=beta type=Data t=172
+PKT_RX node=beta dst=abc6 hops=2 iface=lora0 len=160 type=Data t=175
+PKT_FORWARD node=beta dst=abc6 hops=2 iface_in=lora0 iface_out=tcp1 next_hop=alpha type=Data t=177
+PKT_RX node=alpha dst=abc6 hops=3 iface=tcp1 len=160 type=Data t=180
+PKT_LOCAL node=alpha dst=abc6 iface=tcp1 matched=true t=181
+ANN_RX node=alpha dst=abc7 hops=0 iface=lora0 path_response=true t=200
+ANN_RX node=beta dst=abc7 hops=1 iface=lora0 path_response=false t=205
+ANN_RX node=gamma dst=abc7 hops=2 iface=lora0 path_response=false t=208
+PATH_ADD node=alpha dst=abc7 hops=0 iface=lora0 next_hop=alpha ok=true source=path_response table_len=3 t=201
+PATH_ADD node=beta dst=abc7 hops=1 iface=lora0 next_hop=alpha ok=true source=announce table_len=3 t=206
+PATH_ADD node=gamma dst=abc7 hops=2 iface=lora0 next_hop=beta ok=true source=announce table_len=3 t=209
+PKT_RX node=alpha dst=abc7 hops=0 iface=lora0 len=72 type=Announce t=200
+PKT_RX node=beta dst=abc7 hops=1 iface=lora0 len=72 type=Announce t=205
+PKT_RX node=gamma dst=abc7 hops=2 iface=lora0 len=72 type=Announce t=208
+PKT_RX node=alpha dst=abc1 hops=0 iface=lora0 len=240 type=Data t=240
+PKT_LOCAL node=alpha dst=abc1 iface=lora0 matched=true t=241
+PKT_RX node=beta dst=abc1 hops=1 iface=lora0 len=240 type=Data t=245
+PKT_LOCAL node=beta dst=abc1 iface=lora0 matched=true t=246
