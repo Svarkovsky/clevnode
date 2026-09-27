@@ -37,9 +37,9 @@ pub struct lev_builder_t {
 /// Opaque node handle: owns the hidden runtime, the engine node, and the event
 /// bridge that drains engine events onto a pollable fd.
 pub struct leviculum_t {
-    rt: tokio::runtime::Runtime,
     node: Node,
     events: Arc<EventBridge>,
+    event_rx: std::sync::Mutex<Option<leviculum_std::EventReceiver>>,
 }
 
 impl leviculum_t {
@@ -50,7 +50,7 @@ impl leviculum_t {
 
     /// Borrow the hidden runtime to drive async engine calls.
     pub(crate) fn runtime(&self) -> &tokio::runtime::Runtime {
-        &self.rt
+        self.node.runtime().expect("node runtime not running")
     }
 }
 
@@ -408,21 +408,6 @@ pub unsafe extern "C" fn lev_builder_build(b: *mut lev_builder_t) -> *mut levicu
                 return std::ptr::null_mut();
             }
         };
-        // Multi-thread with one worker so the event-bridge task drains
-        // continuously on its own thread; block_on for the async methods still
-        // runs on the calling C thread.
-        let rt = match tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(1)
-            .thread_stack_size(128 * 1024)
-            .enable_all()
-            .build()
-        {
-            Ok(rt) => rt,
-            Err(e) => {
-                set_last_error(format!("failed to build runtime: {e}"));
-                return std::ptr::null_mut();
-            }
-        };
         let events = match EventBridge::new(control_cap, data_cap) {
             Ok(b) => Arc::new(b),
             Err(e) => {
@@ -430,12 +415,8 @@ pub unsafe extern "C" fn lev_builder_build(b: *mut lev_builder_t) -> *mut levicu
                 return std::ptr::null_mut();
             }
         };
-        // The engine event channels exist from build (not start), so the
-        // receiver is taken now and the bridge survives stop/start cycles.
-        if let Some(rx) = node.take_event_receiver() {
-            rt.spawn(crate::events::run_bridge(rx, Arc::clone(&events)));
-        }
-        Box::into_raw(Box::new(leviculum_t { rt, node, events }))
+        let event_rx = std::sync::Mutex::new(node.take_event_receiver());
+        Box::into_raw(Box::new(leviculum_t { node, events, event_rx }))
     })
 }
 
@@ -447,8 +428,13 @@ pub unsafe extern "C" fn lev_start(node: *mut leviculum_t) -> c_int {
             Some(h) => h,
             None => return LEV_ERR_NULL_PTR,
         };
-        match h.rt.block_on(h.node.start()) {
-            Ok(()) => LEV_OK,
+        match h.node.start_sync() {
+            Ok(()) => {
+                if let Some(rx) = h.event_rx.lock().unwrap().take() {
+                    h.node.runtime().unwrap().spawn(crate::events::run_bridge(rx, Arc::clone(&h.events)));
+                }
+                LEV_OK
+            }
             Err(e) => map_error(&e),
         }
     })
@@ -462,7 +448,7 @@ pub unsafe extern "C" fn lev_stop(node: *mut leviculum_t) -> c_int {
             Some(h) => h,
             None => return LEV_ERR_NULL_PTR,
         };
-        match h.rt.block_on(h.node.stop()) {
+        match h.node.stop_sync() {
             Ok(()) => LEV_OK,
             Err(e) => map_error(&e),
         }
@@ -603,7 +589,7 @@ pub unsafe extern "C" fn lev_free(node: *mut leviculum_t) {
             // event loop via shutdown_background, at the cost of the final
             // flush, which is recovered later from fresh announces.
             let stopped = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                boxed.rt.block_on(boxed.node.stop())
+                boxed.node.stop_sync()
             }));
             if stopped.is_err() {
                 set_last_error_static(

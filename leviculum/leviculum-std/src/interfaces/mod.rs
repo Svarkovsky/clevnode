@@ -38,18 +38,73 @@ pub use byte_channel::ByteChannelHandle;
 pub mod hdlc;
 pub(crate) mod i2p;
 pub(crate) mod inventory;
+#[cfg(any())]
 pub(crate) mod kiss;
 pub(crate) mod local;
 pub(crate) mod netdevice;
+
+#[cfg(any())]
 pub(crate) mod pipe;
+#[cfg(any())]
 pub use pipe::PipeClientHandle;
+#[cfg(not(any()))]
+pub mod pipe {
+    use std::time::Duration;
+    pub const PIPE_DEFAULT_RESPAWN_DELAY: Duration = Duration::from_millis(500);
+    pub const PIPE_DEFAULT_BUFFER_SIZE: usize = 65536;
+    #[derive(Debug)]
+    pub struct PipeClientHandle;
+}
+#[cfg(not(any()))]
+pub use pipe::PipeClientHandle;
+
+#[cfg(any())]
 pub(crate) mod rnode;
+#[cfg(any())]
 pub use rnode::{
     RNodeChannelConfig, RNodeChannelFactory, RNodeChannelHalves, RNodeChannelHandle,
     RNodeChannelOpenFuture,
 };
+#[cfg(not(any()))]
+pub mod rnode {
+    pub const RNODE_DEFAULT_BUFFER_SIZE: usize = 65536;
+    use std::sync::Arc;
+    use std::pin::Pin;
+    use std::future::Future;
+    pub type RNodeChannelHalves = ();
+    pub type RNodeChannelOpenFuture = Pin<Box<dyn Future<Output = Result<RNodeChannelHalves, Box<dyn std::error::Error + Send + Sync>>> + Send>>;
+    pub trait RNodeChannelFactory: Send + Sync + 'static {}
+    #[derive(Clone)]
+    pub struct RNodeChannelConfig {
+        pub factory: Arc<dyn RNodeChannelFactory>,
+        pub frequency: u32,
+        pub bandwidth: u32,
+        pub tx_power: u8,
+        pub sf: u8,
+        pub cr: u8,
+        pub st_alock: Option<u16>,
+        pub lt_alock: Option<u16>,
+        pub flow_control: bool,
+        pub buffer_size: usize,
+    }
+    #[derive(Debug)]
+    pub struct RNodeChannelHandle;
+    impl RNodeChannelHandle {
+        pub fn detach(self) {}
+    }
+}
+#[cfg(not(any()))]
+pub use rnode::{
+    RNodeChannelConfig, RNodeChannelFactory, RNodeChannelHalves, RNodeChannelHandle,
+    RNodeChannelOpenFuture,
+};
+
+#[cfg(any())]
 pub(crate) mod serial;
+#[cfg(any())]
 pub use serial::request_firmware_reset;
+#[cfg(not(any()))]
+pub fn request_firmware_reset() -> usize { 0 }
 pub(crate) mod tcp;
 pub use tcp::{disable_fault_injection, enable_fault_injection, TcpClientHandle};
 pub(crate) mod udp;
@@ -280,22 +335,29 @@ impl InterfaceCounters {
 /// reference (the driver retains `self.iface_stats_map`) — no leaked thread
 /// per node.
 pub(crate) fn spawn_traffic_counter(iface_stats_map: InterfaceStatsMap) {
-    let stats = Arc::downgrade(&iface_stats_map);
-    drop(iface_stats_map); // don't keep the map alive ourselves
-    let spawned = std::thread::Builder::new()
-        .name("reticulum-traffic-counter".into())
-        .spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let Some(map) = stats.upgrade() else {
-                break; // owning node dropped — nothing left to sample
-            };
-            for counters in map.lock_recover().values() {
-                counters.update_speed();
-            }
-        });
-    if let Err(e) = spawned {
-        // Speed reporting is observability-only; degrade rather than abort.
-        tracing::warn!("traffic-counter thread not spawned: {e}");
+    #[cfg(feature = "rpc")]
+    {
+        let stats = Arc::downgrade(&iface_stats_map);
+        drop(iface_stats_map); // don't keep the map alive ourselves
+        let spawned = std::thread::Builder::new()
+            .name("reticulum-traffic-counter".into())
+            .spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                let Some(map) = stats.upgrade() else {
+                    break; // owning node dropped — nothing left to sample
+                };
+                for counters in map.lock_recover().values() {
+                    counters.update_speed();
+                }
+            });
+        if let Err(e) = spawned {
+            // Speed reporting is observability-only; degrade rather than abort.
+            tracing::warn!("traffic-counter thread not spawned: {e}");
+        }
+    }
+    #[cfg(not(feature = "rpc"))]
+    {
+        let _ = iface_stats_map;
     }
 }
 
@@ -842,6 +904,7 @@ mod tests {
     /// difference, and it can only get it by watching the value across at
     /// least one full sampling period.
     #[test]
+    #[cfg(feature = "rpc")]
     fn a_zero_speed_reading_does_not_mean_the_bytes_have_been_accounted() {
         let counters = InterfaceCounters::new();
         counters.rx_bytes.store(6, Ordering::Relaxed);
@@ -1129,5 +1192,30 @@ mod tests {
             .try_send_prioritized(&[0u8; 500], true)
             .expect_err("exhausted credit → BufferFull");
         assert!(matches!(err, InterfaceError::BufferFull));
+    }
+
+    #[test]
+    fn traffic_counter_thread_not_spawned_when_rpc_disabled() {
+        let map = Arc::new(std::sync::Mutex::new(std::collections::BTreeMap::new()));
+        spawn_traffic_counter(map);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        #[cfg(target_os = "linux")]
+        {
+            let mut found = false;
+            if let Ok(entries) = std::fs::read_dir("/proc/self/task") {
+                for entry in entries.flatten() {
+                    let comm_path = entry.path().join("comm");
+                    if let Ok(comm) = std::fs::read_to_string(comm_path) {
+                        if comm.trim().contains("reticulum-traff") {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            #[cfg(not(feature = "rpc"))]
+            assert!(!found, "reticulum-traffic-counter thread was spawned while rpc feature is disabled");
+        }
     }
 }

@@ -51,7 +51,7 @@ serde-pickle = { workspace = true, optional = true }
 # The shared-instance RPC client (`rpc::rpc_query`) decodes pickle
 # responses into `serde_json::Value` so callers (e.g. `lnstest diag`) don't
 # need a pickle dependency themselves.
-serde_json = "1"
+serde_json = { version = "1", optional = true }
 sha2 = { workspace = true, features = ["std"] }
 hmac.workspace = true
 md-5.workspace = true
@@ -91,11 +91,13 @@ critical-section = { version = "1", features = ["std"] }
 ignored = ["md-5", "dbus", "critical-section"]
 
 [dev-dependencies]
+toml = "0.8"
+serde_json = "1"
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 # `test-util` enables `#[tokio::test(start_paused = true)]`: the duty-lock
 # flow-control tests drive multi-second gate thresholds on virtual time
 # instead of sleeping through them.
 tokio = { workspace = true, features = ["test-util"] }
-tracing-subscriber.workspace = true
 hex = "0.4"
 regex = "1"
 tempfile = "3"
@@ -119,8 +121,8 @@ lnomad = { path = "../lnomad" }
 [features]
 default = ["compression"]
 compression = ["leviculum-core/compression"]
-cli = ["dep:clap"]
-rpc = ["dep:serde-pickle"]
+cli = ["dep:clap", "dep:serde_json"]
+rpc = ["dep:serde-pickle", "dep:serde_json"]
 toml-config = ["dep:toml"]
 __compile_fail_fixtures = []
 

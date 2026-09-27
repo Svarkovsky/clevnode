@@ -263,6 +263,134 @@ mod tests {
     // A callback that logs again is routed to stderr by the guard instead of
     // recursing into itself.
     #[test]
+    fn log_level_filtering_gates_events() {
+        let _g = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        crate::ensure_init();
+        CALLS.store(0, Ordering::SeqCst);
+        set_sink(counting_cb);
+
+        // Set to INFO: debug events should not reach callback
+        lev_log_set_level(LEV_LOG_INFO);
+        tracing::debug!("debug message that must be filtered out");
+        assert_eq!(CALLS.load(Ordering::SeqCst), 0, "debug event was not filtered");
+
+        // Info event should reach callback
+        tracing::info!("info message that must pass");
+        assert_eq!(CALLS.load(Ordering::SeqCst), 1, "info event did not reach callback");
+
+        // Error event should reach callback
+        tracing::error!("error message that must pass");
+        assert_eq!(CALLS.load(Ordering::SeqCst), 2, "error event did not reach callback");
+
+        // Set to OFF: no events should reach callback
+        lev_log_set_level(LEV_LOG_OFF);
+        tracing::error!("error message when OFF");
+        assert_eq!(CALLS.load(Ordering::SeqCst), 2, "event was logged while log level was OFF");
+
+        clear_sink();
+    }
+
+    #[test]
+    fn crypto_packages_have_max_optimization_in_release() {
+        let cargo_toml_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("Cargo.toml");
+        let content = std::fs::read_to_string(cargo_toml_path)
+            .expect("failed to read workspace Cargo.toml");
+        assert!(
+            content.contains("[profile.release.package.curve25519-dalek]
+opt-level = 3"),
+            "curve25519-dalek must have opt-level = 3 in release profile"
+        );
+        assert!(
+            content.contains("[profile.release.package.ed25519-dalek]
+opt-level = 3"),
+            "ed25519-dalek must have opt-level = 3 in release profile"
+        );
+        assert!(
+            content.contains("[profile.release.package.x25519-dalek]
+opt-level = 3"),
+            "x25519-dalek must have opt-level = 3 in release profile"
+        );
+    }
+
+    #[test]
+    fn ffi_has_no_duplicated_tokio_runtime_thread() {
+        crate::ensure_init();
+        let builder = crate::node::lev_builder_new();
+        assert!(!builder.is_null());
+        let handle = unsafe { crate::node::lev_builder_build(builder) };
+        assert!(!handle.is_null());
+
+        #[cfg(target_os = "linux")]
+        {
+            let mut found_dup = false;
+            if let Ok(entries) = std::fs::read_dir("/proc/self/task") {
+                for entry in entries.flatten() {
+                    let comm_path = entry.path().join("comm");
+                    if let Ok(comm) = std::fs::read_to_string(comm_path) {
+                        if comm.trim().contains("tokio-runtime") {
+                            found_dup = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            unsafe { crate::node::lev_free(handle) };
+            assert!(
+                !found_dup,
+                "duplicated tokio-runtime thread found in FFI"
+            );
+        }
+    }
+
+    #[test]
+    fn ffi_has_no_serde_json_runtime_dependency() {
+        let output = std::process::Command::new("cargo")
+            .args(["tree", "--manifest-path", "Cargo.toml", "--edges", "normal", "-i", "serde_json"])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .expect("failed to run cargo tree");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !stdout.contains("serde_json"),
+            "serde_json found in leviculum-ffi runtime dependencies:\n{}",
+            stdout
+        );
+    }
+
+    #[test]
+    fn ffi_has_no_rnode_symbols() {
+        let output = std::process::Command::new("nm")
+            .args(["-C", "../../clevnode/libleviculum.a"])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .expect("failed to run nm");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(!stdout.is_empty(), "nm produced empty output on libleviculum.a");
+        assert!(
+            !stdout.contains("rnode_reconnect_task"),
+            "rnode_reconnect_task found in libleviculum.a symbols"
+        );
+    }
+
+    #[test]
+    fn ffi_has_no_regex_dependency() {
+        let output = std::process::Command::new("cargo")
+            .args(["tree", "--manifest-path", "Cargo.toml", "-i", "regex-automata"])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .expect("failed to run cargo tree");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !stdout.contains("regex-automata"),
+            "regex-automata should not be in leviculum-ffi dependencies, found:\n{}",
+            stdout
+        );
+    }
+
+    #[test]
     fn reentrant_callback_does_not_recurse() {
         let _g = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         CALLS.store(0, Ordering::SeqCst);

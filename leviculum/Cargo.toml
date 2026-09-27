@@ -77,7 +77,7 @@ rmp = { version = "0.8.15", default-features = false }
 tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "net", "time", "sync", "macros", "process", "fs", "io-util"] }
 tokio-serial = "5"
 tracing = { version = "0.1", default-features = false, features = ["release_max_level_info"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "registry", "std"] }
 serde = { version = "1", features = ["derive"] }
 rmp-serde = "1"
 rmpv = "1"
@@ -136,6 +136,13 @@ opt-level = 3
 # the symbol table, so panic backtraces still show function names.
 # .deb builds pair this with `cargo deb --no-strip` in
 # .woodpecker/nightly.yml so cargo-deb's strip is skipped entirely.
+[profile.release.package.curve25519-dalek]
+opt-level = 3
+[profile.release.package.ed25519-dalek]
+opt-level = 3
+[profile.release.package.x25519-dalek]
+opt-level = 3
+
 [profile.release]
 opt-level = "z"
 lto = "fat"

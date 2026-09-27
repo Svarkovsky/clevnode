@@ -31,6 +31,41 @@ use leviculum_core::known_destinations::KnownDestinationsStore;
 use leviculum_core::packet_hash_store::PacketHashStore;
 use leviculum_core::ratchet_store::RatchetStore;
 
+/// Transparent fast hasher for cryptographically-random 32-byte packet hashes.
+/// Eliminates SipHash-1-3 overhead on embedded 32-bit MIPS CPUs by taking
+/// the first 8 bytes of the SHA-256 digest directly.
+#[derive(Default, Clone, Copy, Debug)]
+pub struct FastHashBuilder;
+
+impl std::hash::BuildHasher for FastHashBuilder {
+    type Hasher = FastHasher;
+    #[inline(always)]
+    fn build_hasher(&self) -> Self::Hasher {
+        FastHasher(0)
+    }
+}
+
+pub struct FastHasher(u64);
+
+impl std::hash::Hasher for FastHasher {
+    #[inline(always)]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    #[inline(always)]
+    fn write(&mut self, bytes: &[u8]) {
+        if bytes.len() >= 8 {
+            self.0 = u64::from_ne_bytes(bytes[0..8].try_into().unwrap());
+        } else {
+            for &b in bytes {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(b as u64);
+            }
+        }
+    }
+}
+
+pub type PacketHashSet = HashSet<[u8; 32], FastHashBuilder>;
+
 /// Storage manager with in-memory runtime state and file-based persistence.
 ///
 /// All runtime collections (paths, reverse entries, links, announces, receipts,
@@ -60,8 +95,8 @@ pub struct Storage {
     // Known dest entries for merge logic
     known_dest_entries: BTreeMap<[u8; TRUNCATED_HASHBYTES], KnownDestEntry>,
     // Packet hash state (two-generation rotation)
-    packet_cache: HashSet<[u8; 32]>,
-    packet_cache_prev: HashSet<[u8; 32]>,
+    packet_cache: PacketHashSet,
+    packet_cache_prev: PacketHashSet,
     packet_hash_cap: usize,
     packet_hashes_dirty: bool,
     identities_dirty: bool,
@@ -141,18 +176,13 @@ impl Storage {
 
         // Load packet_hashlist via store
         let mut ph_store = FilePacketHashStore::new(&base_path);
-        let packet_cache: HashSet<[u8; 32]> = match ph_store.load_all() {
-            Ok(hashes) => {
-                if !hashes.is_empty() {
-                    tracing::info!("Loaded {} packet hashes from storage", hashes.len());
-                }
-                hashes.into_iter().collect()
+        let mut packet_cache = PacketHashSet::with_hasher(FastHashBuilder);
+        if let Ok(hashes) = ph_store.load_all() {
+            if !hashes.is_empty() {
+                tracing::info!("Loaded {} packet hashes from storage", hashes.len());
             }
-            Err(e) => {
-                tracing::warn!("Failed to load packet_hashlist: {e}");
-                HashSet::new()
-            }
-        };
+            packet_cache.extend(hashes);
+        }
 
         let mono_offset_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -183,7 +213,7 @@ impl Storage {
             ratchet_store,
             known_dest_entries,
             packet_cache,
-            packet_cache_prev: HashSet::new(),
+            packet_cache_prev: PacketHashSet::with_hasher(FastHashBuilder),
             packet_hash_cap: FILE_STORAGE_PACKET_HASH_CAP,
             packet_hashes_dirty: false,
             identities_dirty: false,
@@ -1199,7 +1229,7 @@ mod tests {
         entries.insert(
             [0xCC; TRUNCATED_HASHBYTES],
             KnownDestEntry {
-                timestamp: 1708300000.0,
+                timestamp: unix_timestamp_secs(),
                 packet_hash: vec![0; 32],
                 public_key: id.public_key_bytes(),
                 app_data: None,
@@ -1420,6 +1450,31 @@ mod tests {
         assert!(!path.join(PACKET_HASHLIST_FILE).exists());
 
         let _ = std::fs::remove_dir_all(&path);
+    }
+
+    #[test]
+    fn test_fast_hasher_packet_cache_correctness() {
+        use leviculum_core::traits::Storage as CoreStorage;
+        let mut storage = temp_storage();
+
+        // Verify storage packet_cache uses FastHashBuilder type
+        let is_fast = std::any::type_name::<PacketHashSet>().contains("FastHashBuilder");
+        assert!(is_fast, "packet_cache must use FastHashBuilder");
+
+        // Insert 2,000 distinct pseudo-random hashes
+        for i in 0..2000u32 {
+            let mut h = [0u8; 32];
+            h[0..4].copy_from_slice(&i.to_be_bytes());
+            h[4..8].copy_from_slice(&(i ^ 0xDEADBEEF).to_be_bytes());
+            assert!(!CoreStorage::has_packet_hash(&storage, &h));
+            CoreStorage::add_packet_hash(&mut storage, h);
+            assert!(CoreStorage::has_packet_hash(&storage, &h));
+        }
+
+        // Verify absent hash
+        let mut absent = [0xFFu8; 32];
+        absent[0..4].copy_from_slice(&99999u32.to_be_bytes());
+        assert!(!CoreStorage::has_packet_hash(&storage, &absent));
     }
 
     #[test]

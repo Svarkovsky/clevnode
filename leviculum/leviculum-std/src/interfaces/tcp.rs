@@ -1674,7 +1674,8 @@ mod tests {
         let mut handle = spawn_tcp_client_with_reconnect(TcpClientConfig {
             id: InterfaceId(0),
             name: "test_socks".to_string(),
-            addr: proxy_addr,
+            target_host: proxy_addr.ip().to_string(),
+            target_port: proxy_addr.port(),
             buffer_size: 32,
             corrupt_every: None,
             reconnect_interval: Duration::from_millis(200),
@@ -1706,7 +1707,8 @@ mod tests {
         let mut handle = spawn_tcp_client_with_reconnect(TcpClientConfig {
             id: InterfaceId(0),
             name: "test_detach".to_string(),
-            addr,
+            target_host: addr.ip().to_string(),
+            target_port: addr.port(),
             buffer_size: 16,
             corrupt_every: None,
             reconnect_interval: Duration::from_millis(100),

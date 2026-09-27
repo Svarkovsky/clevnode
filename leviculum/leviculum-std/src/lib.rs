@@ -35,6 +35,7 @@ pub mod interfaces;
 pub(crate) mod known_destinations;
 pub(crate) mod packet_hashlist;
 pub mod process;
+#[cfg(any(feature = "cli", feature = "rpc"))]
 pub mod remote_status;
 pub mod resource_policy;
 pub mod reticulum;
@@ -43,6 +44,7 @@ pub(crate) mod rpc;
 pub mod socket_hook;
 pub(crate) mod storage;
 pub(crate) mod sync_ext;
+#[cfg(test)]
 pub mod test_support;
 pub mod user;
 

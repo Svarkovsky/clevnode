@@ -93,7 +93,7 @@ use tracing::field::{Field, Visit};
 use tracing::{Event, Subscriber};
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{fmt, EnvFilter, Registry};
+use tracing_subscriber::{filter::LevelFilter, fmt, Registry};
 
 const NODE_ENV_VAR: &str = "LEVICULUM_EVENT_NODE";
 const LOG_FILE_ENV_VAR: &str = "LEVICULUM_EVENT_LOG";
@@ -653,9 +653,15 @@ fn parse_t(line: &str) -> Option<u128> {
 /// `default_filter` is the env-filter directive used when `RUST_LOG`
 /// is unset (e.g. `"info"`, `"debug"`, …).
 pub fn install_global_subscriber(default_filter: &str) {
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_filter));
-    let fmt_layer = fmt::layer().compact().with_filter(env_filter);
+    let level_filter = match default_filter.to_lowercase().as_str() {
+        "error" => LevelFilter::ERROR,
+        "warn" => LevelFilter::WARN,
+        "debug" => LevelFilter::DEBUG,
+        "trace" => LevelFilter::TRACE,
+        "off" => LevelFilter::OFF,
+        _ => LevelFilter::INFO,
+    };
+    let fmt_layer = fmt::layer().compact().with_filter(level_filter);
     if std::env::var(LOG_FILE_ENV_VAR).is_ok() {
         let _ = Registry::default().with(fmt_layer).with(layer()).try_init();
     } else {

@@ -246,6 +246,21 @@ impl Node {
         self.inner.stop().await
     }
 
+    /// Borrow the node's Tokio runtime if running.
+    pub fn runtime(&self) -> Option<&tokio::runtime::Runtime> {
+        self.inner.runtime()
+    }
+
+    /// Start the node synchronously.
+    pub fn start_sync(&mut self) -> Result<()> {
+        self.inner.start_sync()
+    }
+
+    /// Stop the node synchronously.
+    pub fn stop_sync(&mut self) -> Result<()> {
+        self.inner.stop_sync()
+    }
+
     /// Whether the event loop is running.
     pub fn is_running(&self) -> bool {
         self.inner.is_running()

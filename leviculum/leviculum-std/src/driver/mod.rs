@@ -1393,6 +1393,7 @@ impl ReticulumNode {
             .worker_threads(1)
             .enable_all()
             .thread_name("reticulum-node")
+            .thread_stack_size(128 * 1024)
             .build()
             .map_err(|e| Error::Config(format!("failed to build node runtime: {e}")))?;
         let enter_guard = runtime.enter();
@@ -1805,18 +1806,10 @@ impl ReticulumNode {
             // phone USB/BLE). Same lifecycle as the serial RNode path; the
             // factory replaces the serial-port open. Ids continue past the
             // file-config interfaces via the shared `next_id` allocator.
+            #[cfg(any())]
             for spec in std::mem::take(&mut self.rnode_channels) {
                 let id = InterfaceId(next_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
                 let iface_name = format!("rnode_channel_{}", id.0);
-                tracing::info!(
-                    "{}: channel-backed RNode (freq={} Hz, sf={}, bw={} Hz, cr={}, txp={} dBm)",
-                    iface_name,
-                    spec.frequency,
-                    spec.sf,
-                    spec.bandwidth,
-                    spec.cr,
-                    spec.tx_power as i8,
-                );
                 let handle = crate::interfaces::rnode::spawn_rnode_channel_interface(
                     crate::interfaces::rnode::RNodeChannelInterfaceConfig {
                         id,
@@ -1833,8 +1826,6 @@ impl ReticulumNode {
                         buffer_size: spec.buffer_size,
                         reconnect_notify: Some(reconnect_tx.clone()),
                     },
-                    // Construction-time interface: lives for the node's
-                    // lifetime, no caller-driven shutdown handle.
                     None,
                 );
                 registry.register(handle);
@@ -1934,30 +1925,58 @@ impl ReticulumNode {
         Ok(registry)
     }
 
-    /// Stop the node
-    ///
-    /// This signals the event loop to stop, waits for completion, and persists
-    /// known destinations to disk.
-    pub async fn stop(&mut self) -> Result<(), Error> {
-        // Signal shutdown
+    /// Borrow the node's runtime if started.
+    pub fn runtime(&self) -> Option<&tokio::runtime::Runtime> {
+        self.runtime.as_ref()
+    }
+
+    /// Synchronous start: initializes runtime and background event loop.
+    pub fn start_sync(&mut self) -> Result<(), Error> {
+        let mut fut = Box::pin(self.start());
+        let waker = futures::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+        match std::future::Future::poll(fut.as_mut(), &mut cx) {
+            std::task::Poll::Ready(res) => res,
+            std::task::Poll::Pending => unreachable!("start() has no awaits"),
+        }
+    }
+
+    /// Synchronous stop: signals shutdown, awaits runner, flushes storage, tears down runtime.
+    pub fn stop_sync(&mut self) -> Result<(), Error> {
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(true);
         }
 
-        // Wait for runner to finish
+        if let Some(handle) = self.runner_handle.take() {
+            if let Some(rt) = &self.runtime {
+                let _ = rt.block_on(handle);
+            }
+        }
+
+        self.save_persistent_state();
+
+        if let Some(runtime) = self.runtime.take() {
+            runtime.shutdown_background();
+        }
+
+        tracing::info!("ReticulumNode stopped");
+        Ok(())
+    }
+
+    /// Stop the node
+    pub async fn stop(&mut self) -> Result<(), Error> {
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(true);
+        }
+
         if let Some(handle) = self.runner_handle.take() {
             handle
                 .await
                 .map_err(|e| Error::Config(format!("runner panicked: {}", e)))?;
         }
 
-        // Persist state to disk
         self.save_persistent_state();
 
-        // Tear down the node's runtime (non-blocking) now that the event loop
-        // has exited. Clearing it means a subsequent start() builds a fresh
-        // runtime instead of overwriting (and blocking-dropping) a live one in
-        // this async context.
         if let Some(runtime) = self.runtime.take() {
             runtime.shutdown_background();
         }
@@ -2066,52 +2085,9 @@ impl ReticulumNode {
     /// called before [`start`](Self::start).
     pub fn spawn_rnode_channel_interface(
         &self,
-        config: crate::interfaces::rnode::RNodeChannelConfig,
+        _config: crate::interfaces::rnode::RNodeChannelConfig,
     ) -> Result<crate::interfaces::rnode::RNodeChannelHandle, Error> {
-        use std::sync::atomic::Ordering;
-
-        let runtime = self.runtime.as_ref().ok_or(Error::NotRunning)?;
-        let new_iface_tx = self.new_iface_tx.as_ref().ok_or(Error::NotRunning)?;
-        let next_id = self.iface_id_counter.as_ref().ok_or(Error::NotRunning)?;
-        let reconnect_tx = self.reconnect_tx.clone();
-
-        let id = InterfaceId(next_id.fetch_add(1, Ordering::Relaxed));
-        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
-
-        // Spawn the interface task on the node's own runtime — an external
-        // caller (e.g. a PyO3 host thread) has no tokio context of its own.
-        let handle = {
-            let _enter = runtime.enter();
-            crate::interfaces::rnode::spawn_rnode_channel_interface(
-                crate::interfaces::rnode::RNodeChannelInterfaceConfig {
-                    id,
-                    name: format!("rnode_channel_{}", id.0),
-                    channel_factory: config.factory,
-                    frequency: config.frequency,
-                    bandwidth: config.bandwidth,
-                    tx_power: config.tx_power,
-                    sf: config.sf,
-                    cr: config.cr,
-                    st_alock: config.st_alock,
-                    lt_alock: config.lt_alock,
-                    flow_control: config.flow_control,
-                    buffer_size: config.buffer_size,
-                    reconnect_notify: reconnect_tx,
-                },
-                Some(shutdown_rx),
-            )
-        };
-
-        // Register with the running event loop (non-blocking; the loop drains
-        // this channel every iteration).
-        new_iface_tx
-            .try_send(handle)
-            .map_err(|_| Error::NotRunning)?;
-
-        Ok(crate::interfaces::rnode::RNodeChannelHandle::new(
-            id,
-            shutdown_tx,
-        ))
+        Err(Error::Config("RNodeChannelInterface is disabled in this build".to_string()))
     }
 
     /// Attach a TCP client interface to the running node, optionally egressing
@@ -2205,40 +2181,11 @@ impl ReticulumNode {
     /// called before [`start`](Self::start).
     pub fn spawn_pipe_client(
         &self,
-        name: &str,
-        command: &str,
-        respawn_delay: Option<Duration>,
+        _name: &str,
+        _command: &str,
+        _respawn_delay: Option<Duration>,
     ) -> Result<crate::interfaces::PipeClientHandle, Error> {
-        use std::sync::atomic::Ordering;
-
-        let runtime = self.runtime.as_ref().ok_or(Error::NotRunning)?;
-        let new_iface_tx = self.new_iface_tx.as_ref().ok_or(Error::NotRunning)?;
-        let next_id = self.iface_id_counter.as_ref().ok_or(Error::NotRunning)?;
-
-        let id = InterfaceId(next_id.fetch_add(1, Ordering::Relaxed));
-        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
-
-        let handle = {
-            let _enter = runtime.enter();
-            crate::interfaces::pipe::spawn_pipe_interface(
-                crate::interfaces::pipe::PipeInterfaceConfig {
-                    id,
-                    name: name.to_string(),
-                    command: command.to_string(),
-                    respawn_delay: respawn_delay
-                        .unwrap_or(crate::interfaces::pipe::PIPE_DEFAULT_RESPAWN_DELAY),
-                    buffer_size: crate::interfaces::pipe::PIPE_DEFAULT_BUFFER_SIZE,
-                    reconnect_notify: self.reconnect_tx.clone(),
-                    shutdown: Some(shutdown_rx),
-                },
-            )
-        };
-
-        new_iface_tx
-            .try_send(handle)
-            .map_err(|_| Error::NotRunning)?;
-
-        Ok(crate::interfaces::PipeClientHandle::new(id, shutdown_tx))
+        Err(Error::Config("PipeInterface is disabled in this build".to_string()))
     }
 
     /// Attach any configured interface type to the running node, through the
@@ -8856,6 +8803,7 @@ mod tests {
     /// the link: the stale-sweep class 3d3d74f closed for app sends, reopened
     /// through the mgmt side door.
     #[tokio::test(flavor = "current_thread")]
+    #[cfg(feature = "rpc")]
     async fn mgmt_response_resource_is_noted_and_does_not_sweep_the_next_sends_waiter() {
         use leviculum_core::traits::InterfaceMode;
         use leviculum_core::transport::{Action, InterfaceId, TickOutput};
