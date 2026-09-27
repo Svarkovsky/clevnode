@@ -62,6 +62,9 @@ The project is distributed under the terms of the **AGPL-3.0-or-later** license 
 
 > **Note on source code compatibility:**
 > Significant architectural changes, optimizations, and patches have been introduced into the original `leviculum` codebase to make it run on 32-bit embedded MIPS processors without an FPU. As a result, **the core source code is no longer backward compatible with the current master branch of the Leviculum repository**. The modified Rust core sources are shipped directly as part of this repository (the `leviculum/` directory) together with the C wrapper `clevnode.c` and build scripts.
+>
+> **Latest Updates in Source Code:**  
+> The most recent, cutting-edge fixes, memory optimizations, and stability patches are maintained directly in the repository source tree (`main` branch). Pre-compiled binaries in GitHub Releases represent stable milestones and may lag behind the continuous development branch. For the freshest improvements and targeted hardware tuning, compiling directly from source via `./build.sh` is recommended.
 
 ---
 
@@ -166,10 +169,11 @@ Running `clevnode` permanently and autonomously on a home router requires only *
    - **FFI event bridge queues (`node.rs`):** Capacities reduced from 512/256 to `DEFAULT_CONTROL_CAP = 64` and `DEFAULT_DATA_CAP = 32`. The C event loop drains events every 500 ms, keeping queues virtually empty.  
    - **Pathfinder lifespan & tags (`constants.rs`):** Route lifetime (`PATHFINDER_EXPIRY_SECS`) reduced from 7 days to 2 days, and path request tags (`MAX_PATH_REQUEST_TAGS`) from 32,000 to 8,000. Stale paths are evicted faster, while Reticulum reactive discovery re-queries active routes on demand.  
    - **Interface announce queues (`MAX_QUEUED_ANNOUNCES_PER_INTERFACE`):** Reduced from 16,384 to 512. Prevents megabytes of RAM from buffering delayed announces on throttled interfaces.
-10. **Storage Lifecycle & Perpetual Timestamp Bug Fix (`known_destinations` & `ratchets`):**  
+10. **Storage Lifecycle & Database Retention Optimizations (`known_destinations` & `ratchets`):**  
     - **Elimination of perpetual timestamp refresh:** Fixed an issue in `storage.rs` where the 15-minute flush interval (`flush_interval = 900`) unconditionally updated the timestamps of all known destinations to `now` (`e.timestamp = timestamp`), preventing entries from ever expiring and ballooning the database to 17,368 entries (2.24 MB).  
     - **True event timestamps:** Timestamps now update only when an actual announce arrives (`set_identity`), mirroring the reference Python Reticulum design (`Identity.remember`).  
-    - **Automatic retention & capacity caps:** Enforced `MAX_KNOWN_DESTINATIONS = 5,000` and `DEFAULT_IDENTITY_CAP = 5,000`. Destinations inactive for > 30 days are pruned at flush and boot.  
+    - **Elimination of disk recombine on flush:** Removed legacy on-disk recombination (`kd_store.load_all()`) in `flush_off_lock`. The memory snapshot is written atomically directly to disk without reviving expired entries, matching modern Python Reticulum behavior where disk recombining is deprecated.  
+    - **Automatic retention & capacity caps:** Enforced `MAX_KNOWN_DESTINATIONS = 5,000` and `DEFAULT_IDENTITY_CAP = 5,000` both in memory and during flush snapshotting. Destinations inactive for > 30 days are pruned at flush and boot.  
     - **Ratchet memory protection:** Startup ratchet loading is capped to the 1,000 most recent ratchets (`MAX_LOADED_RATCHETS = 1,000`), and expired files (> 30 days) are pruned from disk on boot, preventing thousands of files from exhausting RAM.
 11. **Dynamic Multi-Page Serving & Zero-Downtime Hot Reloading (NomadNet):**  
     - **On-demand `mtime` cache:** Page content is no longer frozen in memory at boot. An LRU cache (16 slots) checks file modification time (`stat()`) on every request. If a `.mu` file was edited or uploaded via SCP, it is reloaded and packaged into MessagePack on the fly without restarting the daemon.  
@@ -423,6 +427,9 @@ All paths, names, and network addresses are illustrative. Systems vary depending
 
 > **Зауваження щодо сумісності вихідного коду:**  
 > До оригінальної кодової бази `leviculum` було внесено суттєві архітектурні зміни та оптимізації для роботи на 32-бітних процесорах MIPS без апаратного FPU. Через це **вихідний код ядра більше не є сумісним із поточною гілкою master батьківського репозиторію Leviculum**. Модифіковане ядро Rust постачається безпосередньо у складі цього репозиторію (каталог `leviculum/`) разом із C-оболонкою `clevnode.c` та складальними скриптами.
+>
+> **Актуальність вихідного коду:**  
+> Найновіші та найактуальніші виправлення, оптимізації пам'яті та патчі стабільності підтримуються безпосередньо у вихідному коді репозиторію (гілка `main`). Готові скомпільовані бінарні файли в релізах GitHub фіксують окремі контрольні етапи та можуть відставати від поточного стану коду. Для отримання максимальної швидкодії та найсвіжіших виправлень рекомендується пряма компіляція з вихідних текстів за допомогою `./build.sh`.
 
 ---
 
@@ -527,10 +534,11 @@ All paths, names, and network addresses are illustrative. Systems vary depending
    - **Черги моста подій FFI (`node.rs`):** Місткість черг C-Rust моста зменшено з 512/256 до `DEFAULT_CONTROL_CAP = 64` та `DEFAULT_DATA_CAP = 32`. C-цикл обробляє події кожні 500 мс, тому черги залишаються практично порожніми.  
    - **Час життя шляхів і тегів (`constants.rs`):** Термін придатності маршруту (`PATHFINDER_EXPIRY_SECS`) скорочено з 7 діб до 2 діб, а ліміт тегів (`MAX_PATH_REQUEST_TAGS`) - з 32 000 до 8 000.  
    - **Черги анонсів інтерфейсів (`MAX_QUEUED_ANNOUNCES_PER_INTERFACE`):** Зменшено з 16 384 до 512, що усуває буферизацію тисяч анонсів на шейпованих каналах.
-10. **Усунення витоку бази ідентичностей і вічних таймстампів (`known_destinations` та `ratchets`):**  
+10. **Оптимізація життєвого циклу сховища та ліміти бази (`known_destinations` та `ratchets`):**  
     - **Виправлення бага нескінченного оновлення:** У `storage.rs` ліквідовано цикл у `take_flush_snapshot`, який кожні 15 хвилин (`flush_interval = 900`) перезаписував таймстампи абсолютно всіх записів на поточний час (`e.timestamp = now`), через що база розросталася без обмежень (досягаючи 17 368 записів і 2.24 МБ).  
     - **Справжні таймстампи подій:** Таймстамп фіксується лише при фактичному надходженні анонсу (`set_identity`), строго відповідно до еталону Python Reticulum (`Identity.remember`).  
-    - **Автоматична очистка та ліміти:** Запроваджено ліміт `MAX_KNOWN_DESTINATIONS = 5 000` та `DEFAULT_IDENTITY_CAP = 5 000`. Записи, старіші за 30 днів, автоматично відсікаються при збереженні та старті.  
+    - **Ліквідація злиття з диском при скиданні:** Видалено рудимент перечитування диска (`kd_store.load_all()`) у `flush_off_lock`. Снапшот пам'яті записується на диск напряму й атомарно без повторного воскресіння видалених записів, що відповідає актуальній архітектурі Python Reticulum.  
+    - **Автоматична очистка та ліміти:** Запроваджено ліміт `MAX_KNOWN_DESTINATIONS = 5 000` та `DEFAULT_IDENTITY_CAP = 5 000` в пам'яті та безпосередньо при створенні снапшота для диска. Записи, старіші за 30 днів, автоматично відсікаються при збереженні та старті.  
     - **Кешування ратчетів (`MAX_LOADED_RATCHETS = 1 000`):** При старті в пам'ять завантажуються не більше 1 000 найсвіжіших ратчетів, а застарілі файли (> 30 днів) автоматично видаляються з накопичувача.
 11. **Динамічне обслуговування багатьох сторінок та гаряче оновлення без перезапуску (NomadNet):**  
     - **Ледачий кеш за часом модифікації (`mtime`):** Вміст сторінок більше не фіксується в ОЗП намертво при старті. LRU-кэш (16 слотів) перевіряє системний `stat()` при кожному реальному зверненні. Якщо файл на диску було змінено, він автоматично перечитується на льоту без перезапуску демона.  
@@ -781,6 +789,9 @@ esac
 
 > **Замечание о совместимости исходного кода:**  
 > В оригинальную кодовую базу `leviculum` были внесены существенные архитектурные изменения, оптимизации и патчи для работы на 32-битных встраиваемых MIPS-процессорах без FPU. В связи с этим **исходный код ядра более не является обратно совместимым с актуальной веткой master репозитория Leviculum**. Модифицированные исходные коды Rust-ядра поставляются непосредственно в составе данного репозитория (каталог `leviculum/`) вместе с Си-оболочкой `clevnode.c` и скриптами сборки.
+>
+> **Актуальность исходного кода:**  
+> Самые свежие и последние изменения, оптимизации памяти и патчи стабильности находятся непосредственно в исходном коде репозитория (ветка `main`). Готовые скомпилированные бинарники в релизах GitHub фиксируют контрольные версии и могут отставать от текущего состояния разработки. Для получения наилучшей производительности и самых свежих исправлений рекомендуется самостоятельная сборка из исходников с помощью `./build.sh`.
 
 ---
 
@@ -885,10 +896,11 @@ esac
    - **Очереди событий FFI (`node.rs`):** Емкость очередей моста C-Rust снижена с 512/256 до `DEFAULT_CONTROL_CAP = 64` и `DEFAULT_DATA_CAP = 32`. Си-цикл немедленно вычитывает события каждые 500 мс, поэтому в очередях редко накапливается более 5-10 элементов.  
    - **Время жизни путей (`PATHFINDER_EXPIRY_SECS`):** Сокращено с 7 суток до 2 суток, а лимит тегов запросов путей (`MAX_PATH_REQUEST_TAGS`) - с 32 000 до 8 000. В динамичной сети пути старше 2 суток часто недействительны, а реактивный протокол Reticulum штатно обновляет их через `PATH_REQUEST`.  
    - **Очереди анонсов интерфейсов (`MAX_QUEUED_ANNOUNCES_PER_INTERFACE`):** Снижены с 16 384 до 512. Устраняет буферизацию тысяч устаревающих анонсов на шейпированных каналах (2% полосы).
-10. **Устранение утечки базы идентичностей и вечных таймстампов (`known_destinations` & `ratchets`):**  
+10. **Оптимизация жизненного цикла хранилища и лимиты базы (`known_destinations` & `ratchets`):**  
     - **Ликвидация бага бесконечного омоложения:** В `storage.rs` устранен ошибочный цикл в `take_flush_snapshot`, который каждые 15 минут (`flush_interval = 900`) перезаписывал таймстамп абсолютно всех записей на текущий (`e.timestamp = now`), из-за чего адреса никогда не старели, а база раздулась до 17 368 записей (2.24 МБ).  
     - **Истинные таймстампы событий:** Таймстамп теперь фиксируется строго в момент реального приема анонса (`set_identity`), полностью соответствуя поведению эталонного Python Reticulum (`Identity.remember`).  
-    - **Автоматическая очистка и лимиты:** Введен лимит `MAX_KNOWN_DESTINATIONS = 5 000` и `DEFAULT_IDENTITY_CAP = 5 000`. Записи старше 30 дней автоматически вычищаются при старте и сохранении.  
+    - **Ликвидация слияния с диском при сбросе:** Удален устаревший вызов перечитывания диска (`kd_store.load_all()`) в `flush_off_lock`. Снапшот памяти сохраняется на диск напрямую и атомарно без воскрешения старых записей, в точном соответствии с актуальным Python Reticulum, где слияние с кэшем на диске объявлено устаревшим.  
+    - **Автоматическая очистка и лимиты:** Введен лимит `MAX_KNOWN_DESTINATIONS = 5 000` и `DEFAULT_IDENTITY_CAP = 5 000` в памяти и при формировании снапшота на диск. Записи старше 30 дней автоматически вычищаются при старте и сохранении.  
     - **Кэширование ратчетов (`MAX_LOADED_RATCHETS = 1 000`):** При старте в память загружаются не более 1 000 свежих ратчетов, а просроченные файлы (> 30 дней) автоматически удаляются с накопителя при загрузке.
 11. **Динамическая раздача страниц и горячее обновление без перезапуска (NomadNet):**  
     - **Ленивый кэш по времени модификации (`mtime`):** Контент страниц больше не фиксируется в ОЗУ намертво при старте. LRU-кэш (16 слотов) проверяет системный `stat()` при каждом реальном запросе клиента. Если файл на диске был изменен, он автоматически перечитывается на лету без перезапуска демона.  

@@ -376,19 +376,11 @@ impl FlushSnapshot {
         };
 
         if let Some((generation, entries)) = self.identities {
-            // Merge with on-disk entries (preserving entries added by other
-            // processes, matching Python behavior).
             let mut kd_store = FileKnownDestinationsStore::new(&self.base_path);
-            let mut merged = entries;
-            if let Ok(disk_entries) = kd_store.load_all() {
-                for (hash, entry) in disk_entries {
-                    merged.entry(hash).or_insert(entry);
-                }
-            }
-            match kd_store.save_all(&merged) {
+            match kd_store.save_all(&entries) {
                 Ok(()) => {
                     outcome.identities_written = Some(generation);
-                    tracing::debug!("Saved {} known destinations to storage", merged.len());
+                    tracing::debug!("Saved {} known destinations to storage", entries.len());
                 }
                 Err(e) => {
                     tracing::error!("Failed to save known_destinations: {e}");
@@ -428,6 +420,19 @@ impl Storage {
             let now = unix_timestamp_secs();
             self.known_dest_entries
                 .retain(|_, e| (now - e.timestamp) < KNOWN_DEST_EXPIRY_SECS);
+
+            if self.known_dest_entries.len() > MAX_KNOWN_DESTINATIONS {
+                let mut by_time: Vec<([u8; TRUNCATED_HASHBYTES], f64)> = self
+                    .known_dest_entries
+                    .iter()
+                    .map(|(k, v)| (*k, v.timestamp))
+                    .collect();
+                by_time.sort_unstable_by(|a, b| (a.1 as u64).cmp(&(b.1 as u64)));
+                let excess = self.known_dest_entries.len() - MAX_KNOWN_DESTINATIONS;
+                for (k, _) in by_time.into_iter().take(excess) {
+                    self.known_dest_entries.remove(&k);
+                }
+            }
 
             Some((self.identities_gen, self.known_dest_entries.clone()))
         } else {
