@@ -18,7 +18,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-green?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/platform-MIPS_Big--Endian-orange?style=flat-square" alt="Platform">
-  <img src="https://img.shields.io/badge/RAM-10.9_MB_min_/_14.5_MB_load-brightgreen?style=flat-square" alt="RAM">
+  <img src="https://img.shields.io/badge/RAM-3.7_MB_start_/_18.5_--_22.0_MB_load-brightgreen?style=flat-square" alt="RAM">
   <img src="https://img.shields.io/badge/binary-2.43_MB-blue?style=flat-square" alt="Binary">
   <img src="https://img.shields.io/badge/uptime-50+_hours_continuous-brightgreen?style=flat-square" alt="Uptime">
 </p>
@@ -82,10 +82,10 @@ System metrics were measured directly on a physical **ASUS RT-AC57U V3** router 
 |:---|:---|:---|
 | **Exact Executable Size** | **~2.43&nbsp;MB** | Static binary with `musl libc` (2,432,596 bytes / 2.32 MiB) |
 | **VmRSS (Cold Start)** | **3.7&nbsp;MB** | Measured right after network initialization |
-| **VmRSS (Under Continuous Load)** | **7.7&nbsp;&#8209;&nbsp;14.5&nbsp;MB** | Stabilized resident memory under active multi-peer mesh routing |
-| **VmSize / VSZ (Virtual Memory)** | **4.9&nbsp;&#8209;&nbsp;8.6&nbsp;MB** | Total virtual memory address space |
-| **VmPeak (Peak Memory Spike)** | **6.8&nbsp;MB** | Peak memory during periodic snapshots and burst routing |
-| **VmSwap (Swap File Usage)** | **0&nbsp;KB** | Strictly zero paging under sustained load |
+| **VmRSS (Under Continuous 24/7 Load)** | **18.5&nbsp;&#8209;&nbsp;22.0&nbsp;MB** | Stabilized resident memory under 20-30 peers and 5,000 destinations |
+| **VmSize / VSZ (Virtual Memory)** | **19.8&nbsp;&#8209;&nbsp;25.0&nbsp;MB** | Total virtual memory address space (reduced from 33.2 MB) |
+| **VmPeak (Peak Memory Spike)** | **27.5&nbsp;&#8209;&nbsp;30.0&nbsp;MB** | Peak memory during periodic 15-min database flushes (reduced from 47.8 MB) |
+| **VmSwap (Swap File Usage)** | **0&nbsp;&#8209;&nbsp;3.5&nbsp;MB** | Minimal paging under continuous multi-peer mesh routing |
 
 #### Operating System Thread Distribution:
 The system maintains **3 active threads** (plus transient background DNS resolver tasks):
@@ -182,7 +182,7 @@ Running `clevnode` permanently and autonomously on a home router requires only *
 12. **Unified Tokio Runtime & Single-Threaded Core Scheduling:**  
     - **Elimination of duplicated Tokio runtime:** Consolidated the FFI event bridge and driver network I/O into a single shared Tokio runtime instance (`reticulum-node`). Eliminated the redundant second runtime (`tokio-runtime-w`), dropping an idle OS worker thread, a duplicate epoll instance, and redundant timer wheels.  
     - **Gated traffic counter thread:** Gated `spawn_traffic_counter` behind `#[cfg(feature = "rpc")]`, removing the 1-second waking loop and dedicated OS thread when RPC is disabled.  
-    - **Clamped thread stacks:** Bounded the `reticulum-node` worker thread stack to 128 KB via `.thread_stack_size(128 * 1024)`. Overall system threads dropped to 3, and virtual memory address space (`VmSize`) dropped from 33.2 MB to 4.9 MB.
+    - **Clamped thread stacks:** Bounded the `reticulum-node` worker thread stack to 128 KB via `.thread_stack_size(128 * 1024)`. Overall system threads dropped to 3, virtual memory address space (`VmSize`) dropped to 19.8 - 25.0 MB, and peak memory spike (`VmPeak`) dropped from 47.8 MB to ~27.5 MB (saving over 20 MB of peak RAM).
 13. **MIPS Hardware Acceleration & Zero-Overhead Packet Deduplication:**  
     - **Curve25519 unrolled loops (`opt-level = 3`):** Configured package-level release profile overrides for `curve25519-dalek`, `ed25519-dalek`, and `x25519-dalek`. LLVM unrolls 32-bit field multiplications, boosting link handshakes and packet verification by 30-40% on MIPS without FPU.  
     - **Direct 8-byte digest hasher (`FastHashBuilder`):** Replaced standard SipHash-1-3 in `packet_cache` with a transparent hasher that takes the first 8 bytes of the SHA-256 digest in a single instruction. Cuts transit packet deduplication overhead from ~250 CPU cycles to zero.  
@@ -455,10 +455,10 @@ All paths, names, and network addresses are illustrative. Systems vary depending
 |:---|:---|:---|
 | **Точний розмір бінарного файлу** | **~2.43&nbsp;МБ** | Статичний бінарник зі збіркою під `musl libc` (2 432 596 байт / 2.32 MiB) |
 | **VmRSS (холодний старт)** | **3.7&nbsp;МБ** | Зафіксовано одразу після ініціалізації стека |
-| **VmRSS (під тривалим навантаженням)** | **7.7&nbsp;&#8209;&nbsp;14.5&nbsp;МБ** | Стабілізована резидентна пам'ять під транзитною маршрутизацією |
-| **VmSize / VSZ (віртуальна пам'ять)** | **4.9&nbsp;&#8209;&nbsp;8.6&nbsp;МБ** | Загальний простір віртуальних адрес |
-| **VmPeak (піковий сплеск споживання)** | **6.8&nbsp;МБ** | Максимальне значення під час періодичного скидання на накопичувач |
-| **VmSwap (використання swap)** | **0&nbsp;КБ** | Пам'ять не витісняється на накопичувач |
+| **VmRSS (під безперервним навантаженням 24/7)** | **18.5&nbsp;&#8209;&nbsp;22.0&nbsp;МБ** | Стабілізована резидентна пам'ять під навантаженням 20-30 пірів і 5 000 вузлів |
+| **VmSize / VSZ (віртуальна пам'ять)** | **19.8&nbsp;&#8209;&nbsp;25.0&nbsp;МБ** | Загальний простір віртуальних адрес (скорочено з 33.2 МБ) |
+| **VmPeak (піковий сплеск споживання)** | **27.5&nbsp;&#8209;&nbsp;30.0&nbsp;МБ** | Максимальне значення під час періодичного скидання бази (скорочено з 47.8 МБ) |
+| **VmSwap (використання swap)** | **0&nbsp;&#8209;&nbsp;3.5&nbsp;МБ** | Мінімальне звернення до накопичувача під транзитним навантаженням |
 
 #### Розподіл потоків у системі:
 У системі постійно працюють **3 постійних активних потоки** (плюс тимчасові сервісні завдання резолвінгу DNS):
@@ -555,7 +555,7 @@ All paths, names, and network addresses are illustrative. Systems vary depending
 12. **Об'єднання рантаймів Tokio та ліквідація зайвих потоків ОС:**  
     - **Ліквідація дублюючого екземпляра Tokio:** FFI-міст подій та мережевий ввід/вивід драйвера об'єднані в єдиний рантайм Tokio (`reticulum-node`). Усунуто окремий потік воркера (`tokio-runtime-w`), дублюючий epoll та зайві таймерні колеса.  
     - **Відключення фонового лічильника швидкості:** Запуск потоку `spawn_traffic_counter` ізольовано під `#[cfg(feature = "rpc")]`, усуваючи щосекундні перемикання контексту процесора.  
-    - **Фіксація стека воркера:** Стек воркера `reticulum-node` обмежено до 128 КБ (`thread_stack_size(128 * 1024)`). Кількість постійних потоків процесу скорочено до 3, а віртуальне адресне середовище (`VmSize`) впало з 33.2 МБ до 4.9 МБ.
+    - **Фіксація стека воркера:** Стек воркера `reticulum-node` обмежено до 128 КБ (`thread_stack_size(128 * 1024)`). Кількість постійних потоків процесу скорочено до 3, віртуальне адресне середовище (`VmSize`) впало до 19.8 - 25.0 МБ, а піковий сплеск пам'яті (`VmPeak`) скоротився з 47.8 МБ до ~27.5 МБ (економія понад 20 МБ пікового ОЗП).
 13. **Апаратна оптимізація MIPS та миттєва дедуплікація пакетів:**  
     - **Розгортання циклів Curve25519 (`opt-level = 3`):** Для пакетів `curve25519-dalek`, `ed25519-dalek` та `x25519-dalek` увімкнено максимальну оптимізацію в профілі `release`. Компілятор розгортає 32-бітну арифметику полів, прискорюючи рукостискання Link та перевірку підписів на 30-40% на MIPS без FPU.  
     - **Прямий 8-байтний хешер (`FastHashBuilder`):** Стандартний SipHash-1-3 у `packet_cache` замінено на прозорий хешер, що зчитує перші 8 байт SHA-256 за 1 інструкцію. Накладні витрати CPU на дедуплікацію транзитних пакетів зведено до нуля.  
@@ -825,10 +825,10 @@ esac
 |:---|:---|:---|
 | **Точный размер исполняемого файла** | **~2.43&nbsp;МБ** | Статический бинарник со сборкой под `musl libc` (2 432 596 байт / 2.32 MiB) |
 | **VmRSS (холодный старт)** | **3.7&nbsp;МБ** | Зафиксировано сразу после инициализации стека |
-| **VmRSS (под длительной нагрузкой)** | **7.7&nbsp;&#8209;&nbsp;14.5&nbsp;МБ** | Стабилизированная резидентная память под транзитной маршрутизацией |
-| **VmSize / VSZ (объем виртуальной памяти)** | **4.9&nbsp;&#8209;&nbsp;8.6&nbsp;МБ** | Общее виртуальное адресное пространство процесса |
-| **VmPeak (пиковый всплеск потребления)** | **6.8&nbsp;МБ** | Максимальное значение во время периодического сброса на накопитель |
-| **VmSwap (использование файла подкачки)** | **0&nbsp;КБ** | Память не сбрасывается в своп на накопитель |
+| **VmRSS (под непрерывной нагрузкой 24/7)** | **18.5&nbsp;&#8209;&nbsp;22.0&nbsp;МБ** | Стабилизированная резидентная память под нагрузкой 20-30 пиров и 5 000 узлов |
+| **VmSize / VSZ (объем виртуальной памяти)** | **19.8&nbsp;&#8209;&nbsp;25.0&nbsp;МБ** | Общее виртуальное адресное пространство процесса (снижено с 33.2 МБ) |
+| **VmPeak (пиковый всплеск потребления)** | **27.5&nbsp;&#8209;&nbsp;30.0&nbsp;МБ** | Максимальное значение во время периодического сброса базы (снижено с 47.8 МБ) |
+| **VmSwap (использование файла подкачки)** | **0&nbsp;&#8209;&nbsp;3.5&nbsp;МБ** | Минимальное обращение к свопу под постоянной транзитной нагрузкой |
 
 #### Распределение потоков в операционной системе:
 В системе постоянно активно **3 постоянных потока** (плюс временные сервисные задачи резолвинга DNS):
@@ -925,7 +925,7 @@ esac
 12. **Объединение рантаймов Tokio и ликвидация лишних системных потоков:**  
     - **Ликвидация дублирующего экземпляра Tokio:** FFI-мост событий и сетевой ввод/вывод драйвера объединены в единый рантайм Tokio (`reticulum-node`). Устранен отдельный поток воркера (`tokio-runtime-w`), дублирующий epoll и лишние таймерные колеса.  
     - **Отключение фонового счетчика скорости:** Запуск потока `spawn_traffic_counter` изолирован под `#[cfg(feature = "rpc")]`, устраняя ежесекундные холостые переключения контекста процессора.  
-    - **Ограничение стека воркера:** Стек рабочего потока `reticulum-node` ограничен до 128 КБ (`thread_stack_size(128 * 1024)`). Количество постоянных потоков процесса снижено до 3, а виртуальное адресное пространство (`VmSize`) упало с 33.2 МБ до 4.9 МБ.
+    - **Ограничение стека воркера:** Стек рабочего потока `reticulum-node` ограничен до 128 КБ (`thread_stack_size(128 * 1024)`). Количество постоянных потоков процесса снижено до 3, виртуальное адресное пространство (`VmSize`) упало до 19.8 - 25.0 МБ, а пиковый всплеск памяти (`VmPeak`) снизился с 47.8 МБ до ~27.5 МБ (экономия более 20 МБ пикового ОЗУ).
 13. **Аппаратная оптимизация MIPS и мгновенная дедупликация пакетов:**  
     - **Разворачивание циклов Curve25519 (`opt-level = 3`):** Для пакетов `curve25519-dalek`, `ed25519-dalek` и `x25519-dalek` включена максимальная оптимизация в профиле `release`. Компилятор разворачивает 32-битную арифметику полей, ускоряя рукопожатия Link и проверку подписей на 30-40% на MIPS без FPU.  
     - **Прямой 8-байтный хешер (`FastHashBuilder`):** Стандартный SipHash-1-3 в `packet_cache` заменен на прозрачный хешер, считывающий первые 8 байт SHA-256 за 1 процессорную инструкцию. Накладные расходы CPU на дедупликацию транзитных пакетов сведены к нулю.  

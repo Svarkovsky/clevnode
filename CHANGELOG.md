@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 - **Tokio Runtime Unification:** Consolidated the FFI event bridge and driver network I/O into a single shared Tokio runtime instance (`reticulum-node`). Eliminated the redundant second runtime (`tokio-runtime-w`), dropping an idle OS worker thread, a duplicate epoll instance, and redundant timer wheels.
 - **Traffic Counter Thread Elimination:** Gated `spawn_traffic_counter` behind `#[cfg(feature = "rpc")]`, removing the 1-second waking loop and dedicated OS thread when RPC is disabled.
 - **Worker Stack Capping:** Enforced a strict 128 KB stack limit (`thread_stack_size(128 * 1024)`) on the unified `reticulum-node` worker thread in `driver/mod.rs`.
-- **System Resource Footprint:** Reduced constant system threads from 5-6 down to exactly 3 (C main thread, C NomadNet worker, and single Tokio worker). Virtual address space (`VmSize`) dropped from 33.2 MB to 4.9 MB (-85%), and memory peak spike (`VmPeak`) dropped from 47.8 MB to 6.8 MB (-86%).
+- **System Resource Footprint:** Reduced constant system threads from 5-6 down to exactly 3 (C main thread, C NomadNet worker, and single Tokio worker). Virtual address space (`VmSize`) dropped from 33.2 MB to 19.8 - 25.0 MB, and memory peak spike (`VmPeak`) dropped from 47.8 MB to ~27.5 MB (saving >20 MB of peak RAM under full 24/7 load with 5,000 destinations and 18k packet dedup hashes).
 
 ### Binary Size & Dead-Weight Dependency Pruning
 - **Regex Engine Elimination:** Removed `features = ["env-filter"]` from workspace `tracing-subscriber`, completely eliminating `matchers`, `regex-automata`, and `regex-syntax` (~280 KB of compiled code). Migrated `event_log.rs` to static `LevelFilter`.
