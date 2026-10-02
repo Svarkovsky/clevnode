@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Multi-Architecture & CI/CD
+- **Automated Multi-Target CI Pipeline:** Implemented automated cross-compilation in `.github/workflows/release.yml` with pre-release verification using QEMU user-mode emulation across 6 architectures:
+  - `mips-unknown-linux-musl` (MIPS Big-Endian, ath79, soft-float)
+  - `mipsel-unknown-linux-musl` (MIPS Little-Endian, MediaTek MT7620/MT7621/MT7628, ramips, soft-float)
+  - `armv7-unknown-linux-musleabihf` (ARMv7-A 32-bit, Raspberry Pi 2/Zero 2W, Orange Pi, hard-float)
+  - `aarch64-unknown-linux-musl` (ARM64, Raspberry Pi 3/4/5, Cortex-A53/A72)
+  - `x86_64-unknown-linux-musl` (x86_64 64-bit generic PC and VPS)
+  - `i686-unknown-linux-musl` (i686 32-bit x86 legacy PC and thin clients)
+- **Automated Distribution Packaging:** Added `scripts/package_target.sh` generating standalone distribution zip archives containing `clevnode`, `.reticulum/config`, `posts/index.mu`, `S90clevnode`, and md5 checksums for each target architecture.
+- **CLI Options for Diagnostics:** Added `--help` / `-h` and `--version` / `-v` handling in `clevnode.c` before `setsid()` daemonization.
+
 ### Performance & MIPS Hardware Acceleration
 - **Curve25519 Unrolled Field Arithmetic:** Added package-level release profile overrides (`opt-level = 3`) for `curve25519-dalek`, `ed25519-dalek`, and `x25519-dalek` in `leviculum/Cargo.toml`. Gives LLVM permission to unroll 32-bit limb multiplications and inversions on MIPS without FPU, delivering a 30-40% speedup on Link establishment and announce verification.
 - **Zero-Overhead Packet Deduplication (FastHashBuilder):** Replaced default SipHash-1-3 in `packet_cache` and `packet_cache_prev` (`storage.rs`) with a transparent 8-byte prefix hasher (`FastHashBuilder`). Because transit packet hashes are already cryptographically uniform SHA-256 digests, extracting the first 8 bytes takes a single load instruction on MIPS, cutting packet dedup CPU overhead from ~250 cycles down to near zero.

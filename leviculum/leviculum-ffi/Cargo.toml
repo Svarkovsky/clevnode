@@ -12,7 +12,7 @@ description = "C-API/FFI bindings for reticulum"
 # functions directly; it is an extra artifact and does not affect the shipped
 # cdylib/staticlib.
 name = "leviculum"
-crate-type = ["cdylib", "staticlib", "rlib"]
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 leviculum-std = { path = "../leviculum-std" }

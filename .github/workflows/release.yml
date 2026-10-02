@@ -1,0 +1,180 @@
+name: Build & Release Multi-Arch
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: mips-unknown-linux-musl
+            arch: mips-ath79-bigendian
+            toolchain_url: https://musl.cc/mips-linux-muslsf-cross.tgz
+            toolchain_dir: mips-linux-muslsf-cross
+            cc: mips-linux-muslsf-gcc
+            strip: mips-linux-muslsf-strip
+            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            qemu: qemu-mips-static
+
+          - target: mipsel-unknown-linux-musl
+            arch: mipsel-ramips-littleendian
+            toolchain_url: https://musl.cc/mipsel-linux-muslsf-cross.tgz
+            toolchain_dir: mipsel-linux-muslsf-cross
+            cc: mipsel-linux-muslsf-gcc
+            strip: mipsel-linux-muslsf-strip
+            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            qemu: qemu-mipsel-static
+
+          - target: armv7-unknown-linux-musleabihf
+            arch: armv7-cortexa7-hardfloat
+            toolchain_url: https://musl.cc/armv7l-linux-musleabihf-cross.tgz
+            toolchain_dir: armv7l-linux-musleabihf-cross
+            cc: armv7l-linux-musleabihf-gcc
+            strip: armv7l-linux-musleabihf-strip
+            cflags: -Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-ident -fno-stack-protector -fomit-frame-pointer
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            qemu: qemu-arm-static
+
+          - target: aarch64-unknown-linux-musl
+            arch: arm64-aarch64
+            toolchain_url: https://musl.cc/aarch64-linux-musl-cross.tgz
+            toolchain_dir: aarch64-linux-musl-cross
+            cc: aarch64-linux-musl-gcc
+            strip: aarch64-linux-musl-strip
+            cflags: -Os -march=armv8-a -fno-ident -fno-stack-protector -fomit-frame-pointer
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            qemu: qemu-aarch64-static
+
+          - target: x86_64-unknown-linux-musl
+            arch: x86_64-generic
+            toolchain_url: https://musl.cc/x86_64-linux-musl-cross.tgz
+            toolchain_dir: x86_64-linux-musl-cross
+            cc: x86_64-linux-musl-gcc
+            strip: x86_64-linux-musl-strip
+            cflags: -Os -march=x86-64 -fno-ident -fno-stack-protector -fomit-frame-pointer
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            qemu: ""
+
+          - target: i686-unknown-linux-musl
+            arch: i686-x86-32bit
+            toolchain_url: https://musl.cc/i686-linux-musl-cross.tgz
+            toolchain_dir: i686-linux-musl-cross
+            cc: i686-linux-musl-gcc
+            strip: i686-linux-musl-strip
+            cflags: -Os -march=i686 -fno-ident -fno-stack-protector -fomit-frame-pointer
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            qemu: qemu-i386-static
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install QEMU User Static Emulation
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-user-static zip
+
+      - name: Install Rust Nightly Toolchain
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup component add rust-src --toolchain nightly
+
+      - name: Cache Musl Toolchain
+        id: cache-toolchain
+        uses: actions/cache@v4
+        with:
+          path: toolchains/${{ matrix.toolchain_dir }}
+          key: toolchain-${{ matrix.toolchain_dir }}-v1
+
+      - name: Download Musl Toolchain
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p toolchains
+          cd toolchains
+          curl --retry 3 --retry-delay 5 -fSL "${{ matrix.toolchain_url }}" -o toolchain.tgz
+          tar -xf toolchain.tgz
+          rm -f toolchain.tgz
+
+      - name: Build Rust static core (libleviculum.a)
+        run: |
+          cd leviculum
+          cargo +nightly build \
+            --target ${{ matrix.target }} \
+            --release \
+            -p leviculum-ffi \
+            -Zbuild-std=std,panic_abort \
+            -Zbuild-std-features=optimize_for_size
+
+      - name: Compile and Link clevnode C Monolith
+        run: |
+          TOOLCHAIN_BIN="$GITHUB_WORKSPACE/toolchains/${{ matrix.toolchain_dir }}/bin"
+          export PATH="$TOOLCHAIN_BIN:$PATH"
+
+          cp "leviculum/target/${{ matrix.target }}/release/libleviculum.a" "clevnode/libleviculum.a"
+
+          cd clevnode
+          ${{ matrix.cc }} ${{ matrix.cflags }} -I. clevnode.c libleviculum.a -o clevnode ${{ matrix.ldflags }}
+          ${{ matrix.strip }} -s -R .comment -R .note -R .note.gnu.build-id -R .note.ABI-tag clevnode
+          ls -lh clevnode
+
+      - name: Verify Binary Execution via QEMU
+        run: |
+          cd clevnode
+          if [ -n "${{ matrix.qemu }}" ]; then
+            ${{ matrix.qemu }} ./clevnode --version
+          else
+            ./clevnode --version
+          fi
+
+      - name: Package Distribution Archive
+        run: |
+          VERSION="${GITHUB_REF_NAME:-v0.1.1-dev}"
+          chmod +x scripts/package_target.sh
+          ./scripts/package_target.sh clevnode/clevnode "${{ matrix.arch }}" "$VERSION" Releases
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clevnode-${{ matrix.arch }}
+          path: |
+            Releases/*.zip
+            Releases/*.zip.md5
+          if-no-files-found: error
+
+  publish:
+    name: Publish Release Assets
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Consolidate Release Assets
+        run: |
+          mkdir -p release_assets
+          find dist/ -type f \( -name "*.zip" -o -name "*.md5" \) -exec cp {} release_assets/ \;
+          ls -la release_assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release_assets/*
+          generate_release_notes: true

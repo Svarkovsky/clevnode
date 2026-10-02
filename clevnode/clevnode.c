@@ -683,6 +683,17 @@ static void load_node_name_from_config(const char *config_path) {
  * @return 0 on successful termination, non-zero on failure.
  */
 int main(int argc, char **argv) {
+    if (argc > 1 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
+        printf("Usage: clevnode [CONFIG_DIR] [POSTS_DIR] [IDENTITY_FILE]\n");
+        printf("   or: clevnode --version | -v\n");
+        printf("   or: clevnode --help | -h\n");
+        return 0;
+    }
+    if (argc > 1 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0)) {
+        printf("clevnode v0.1.0\n");
+        return 0;
+    }
+
     setsid();
 
     setvbuf(stdout, NULL, _IONBF, 0);

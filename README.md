@@ -190,11 +190,17 @@ Running `clevnode` permanently and autonomously on a home router requires only *
 
 ---
 
-### 6. Hardware Support & Porting Horizons
+### 6. Hardware Support & Architectures
 
-* **Supported Architecture:** MIPS Big-Endian (MSB) (Qualcomm Atheros AR9xxx, QCA95xx, QCA55xx; OpenWrt target `ath79`).
-* **Incompatible Architecture:** MediaTek / Ralink (MT7620, MT7621, MT7628) operating in Little-Endian (`mipsel`) mode will fail with `Exec format error`.
-* **Hardware FPU:** Not required; soft-float math is statically linked (`-msoft-float`).
+Official standalone static release archives are compiled and verified via QEMU for **6 hardware architectures**:
+
+* **MIPS Big-Endian (`mips-unknown-linux-musl`):** Qualcomm Atheros AR9xxx, QCA95xx, QCA55xx (OpenWrt `ath79`).
+* **MIPSEL Little-Endian (`mipsel-unknown-linux-musl`):** MediaTek / Ralink MT7620, MT7621, MT7628 (OpenWrt/Keenetic `ramips`).
+* **ARMv7-A 32-bit (`armv7-unknown-linux-musleabihf`):** Cortex-A7/A9, Raspberry Pi 2 / Zero 2W, Orange Pi (hard-float).
+* **ARM64 / AArch64 (`aarch64-unknown-linux-musl`):** Cortex-A53/A72, Raspberry Pi 3/4/5, modern ARM routers and VPS.
+* **x86_64 (`x86_64-unknown-linux-musl`):** 64-bit Intel / AMD servers, PC, and VPS.
+* **i686 (`i686-unknown-linux-musl`):** 32-bit x86 legacy hardware and thin clients.
+* **Hardware FPU:** Not required on MIPS/MIPSEL; soft-float math is statically linked (`-msoft-float`).
 * **Kernel Compatibility:** Compiled with `musl libc`, which requires a minimum of **Linux 2.6.39**. While 2.6.39 has not been validated on physical hardware, it is expected to function thanks to the Linux syscall ABI stability. **Fully verified on Linux kernel 3.4.103-rt119**. Modern kernels (4.x, 5.x, 6.x) are supported natively.
 
 > **Porting to Other Architectures:**  
@@ -563,11 +569,17 @@ All paths, names, and network addresses are illustrative. Systems vary depending
 
 ---
 
-### 6. Апаратна платформа та перенесення на інші архітектури
+### 6. Апаратна платформа та підтримувані архітектури
 
-* **Підтримувана архітектура:** MIPS Big-Endian (MSB) (Qualcomm Atheros AR9xxx, QCA95xx, QCA55xx, таргет OpenWrt `ath79`).
-* **Несумісна архітектура:** MediaTek / Ralink (MT7620, MT7621, MT7628) працюють у Little-Endian (`mipsel`) і видадуть `Exec format error`.
-* **Апаратний FPU:** Не потрібен; розрахунки ведуться програмно завдяки `-msoft-float`.
+Офіційні автономні статичні релізні архіви збираються та тестуються через QEMU для **6 апаратних архітектур**:
+
+* **MIPS Big-Endian (`mips-unknown-linux-musl`):** Qualcomm Atheros AR9xxx, QCA95xx, QCA55xx (таргет OpenWrt `ath79`).
+* **MIPSEL Little-Endian (`mipsel-unknown-linux-musl`):** MediaTek / Ralink MT7620, MT7621, MT7628 (OpenWrt/Keenetic `ramips`).
+* **ARMv7-A 32-bit (`armv7-unknown-linux-musleabihf`):** Cortex-A7/A9, Raspberry Pi 2 / Zero 2W, Orange Pi (hard-float).
+* **ARM64 / AArch64 (`aarch64-unknown-linux-musl`):** Cortex-A53/A72, Raspberry Pi 3/4/5, сучасні ARM-роутери та VPS.
+* **x86_64 (`x86_64-unknown-linux-musl`):** 64-бітні сервери Intel / AMD, ПК та VPS.
+* **i686 (`i686-unknown-linux-musl`):** 32-бітні x86 платформи та тонкі клієнти.
+* **Апаратний FPU:** Не потрібен на MIPS/MIPSEL; розрахунки ведуться програмно завдяки `-msoft-float`.
 * **Сумісність з ядрами Linux:** Бінарник зібраний із `musl libc`, яка потребує ядра **Linux 2.6.39 або новішого**. На версії 2.6.39 робота прямо не перевірялася, але має забезпечуватися стабільністю системних викликів. **Підтверджено бездоганну роботу на ядрі 3.4.103-rt119**. Ядра 4.x, 5.x та 6.x підтримуються архітектурно.
 
 > **Плани щодо перенесення:**  
@@ -933,11 +945,17 @@ esac
 
 ---
 
-### 6. Аппаратная платформа и планы портирования
+### 6. Аппаратная платформа и поддерживаемые архитектуры
 
-* **Поддерживаемая архитектура:** MIPS Big-Endian (MSB) (SoC Qualcomm Atheros: AR9xxx, QCA95xx, QCA55xx, таргет OpenWrt `ath79`).
-* **Несовместимая архитектура:** Процессоры MediaTek/Ralink (MT7620, MT7621, MT7628) работают в Little-Endian (`mipsel`) и вызовут ошибку `Exec format error`.
-* **Аппаратный FPU:** Не требуется; вычисления проводятся программно благодаря `-msoft-float`.
+Официальные автономные статические релизные архивы собираются и проверяются через QEMU для **6 аппаратных архитектур**:
+
+* **MIPS Big-Endian (`mips-unknown-linux-musl`):** Qualcomm Atheros AR9xxx, QCA95xx, QCA55xx (таргет OpenWrt `ath79`).
+* **MIPSEL Little-Endian (`mipsel-unknown-linux-musl`):** MediaTek / Ralink MT7620, MT7621, MT7628 (OpenWrt/Keenetic `ramips`).
+* **ARMv7-A 32-bit (`armv7-unknown-linux-musleabihf`):** Cortex-A7/A9, Raspberry Pi 2 / Zero 2W, Orange Pi (hard-float).
+* **ARM64 / AArch64 (`aarch64-unknown-linux-musl`):** Cortex-A53/A72, Raspberry Pi 3/4/5, современные ARM-роутеры и VPS.
+* **x86_64 (`x86_64-unknown-linux-musl`):** 64-битные серверы Intel / AMD, ПК и VPS.
+* **i686 (`i686-unknown-linux-musl`):** 32-битные платформы x86 и тонкие клиенты.
+* **Аппаратный FPU:** Не требуется на MIPS/MIPSEL; вычисления проводятся программно благодаря `-msoft-float`.
 * **Совместимость с ядрами Linux:**  
   Бинарный файл скомпилирован со статической библиотекой `musl libc`, минимальным системным требованием которой является ядро **Linux 2.6.39**.  
   *На ядрах 2.6.39 работа напрямую не проверялась*, однако теоретически бинарник должен запускаться на любых ядрах от 2.6.39 и новее благодаря правилу ядра Linux «never break userspace» и стабильности ABI системных вызовов.  
