@@ -83,8 +83,8 @@ jobs:
 
       - name: Install QEMU User Static Emulation
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq qemu-user-static zip xz-utils
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="15" -qq || true
+          sudo apt-get install -y --no-install-recommends -qq qemu-user-static
 
       - name: Install Rust Nightly Toolchain
         run: |
