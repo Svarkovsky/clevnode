@@ -23,8 +23,8 @@ jobs:
             toolchain_dir: mips-linux-musl
             cc: mips-linux-musl-gcc
             strip: mips-linux-musl-strip
-            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared
-            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared -no-pie
+            ldflags: -static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-mips-static
 
           - target: mipsel-unknown-linux-musl
@@ -33,8 +33,8 @@ jobs:
             toolchain_dir: mipsel-linux-musl
             cc: mipsel-linux-musl-gcc
             strip: mipsel-linux-musl-strip
-            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared
-            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared -no-pie
+            ldflags: -static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-mipsel-static
 
           - target: armv7-unknown-linux-musleabihf
