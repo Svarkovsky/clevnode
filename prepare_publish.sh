@@ -129,7 +129,7 @@ git status
 echo ""
 echo "Next steps to publish:"
 echo "1. git add ."
-echo "2. git commit -m \"Initial commit: clevnode v0.1.0 for MIPS\""
+echo "2. git commit -m \"Initial commit: clevnode v0.1.1\""
 echo "3. git remote add origin https://github.com/Svarkovsky/clevnode.git"
 echo "4. git push -u origin main"
 echo "========================================================================"

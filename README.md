@@ -64,7 +64,7 @@ The project is distributed under the terms of the **AGPL-3.0-or-later** license 
 > Significant architectural changes, optimizations, and patches have been introduced into the original `leviculum` codebase to make it run on 32-bit embedded MIPS processors without an FPU. As a result, **the core source code is no longer backward compatible with the current master branch of the Leviculum repository**. The modified Rust core sources are shipped directly as part of this repository (the `leviculum/` directory) together with the C wrapper `clevnode.c` and build scripts.
 >
 > **Latest Updates in Source Code:**  
-> The most recent, cutting-edge fixes, memory optimizations, and stability patches are maintained directly in the repository source tree (`main` branch). Pre-compiled binaries in GitHub Releases represent stable milestones and may lag behind the continuous development branch. For the freshest improvements and targeted hardware tuning, compiling directly from source via `./build.sh` is recommended.
+> The most recent, cutting-edge fixes, memory optimizations, and stability patches are maintained directly in the repository source tree (`main` branch). Pre-compiled binaries in GitHub Releases represent stable milestones and may lag behind the continuous development branch. For the freshest improvements and targeted hardware tuning, compiling directly from source via `./build_mips_be.sh` is recommended.
 
 ---
 
@@ -114,7 +114,7 @@ Running `clevnode` permanently and autonomously on a home router requires only *
 > During prolonged operation (months of mesh uptime, route caching, and dedup lists), the node and its runtime state require **at least 15 MB of free storage space** on the USB drive or router flash memory.
 
 > **Directory Naming on Deployment:**  
-> The build script `build.sh` produces a default configuration in `clevnode/reticulum/config` for local repository convenience. When copying files to the router (e.g. into `/tmp/mnt/sda1/home/lblogd/`), this directory must be renamed to **`.reticulum`** (with a leading dot). This matches the binary's runtime lookup and keeps the working directory clean.
+> The build script `build_mips_be.sh` produces a default configuration in `clevnode/reticulum/config` for local repository convenience. When copying files to the router (e.g. into `/tmp/mnt/sda1/home/lblogd/`), this directory must be renamed to **`.reticulum`** (with a leading dot). This matches the binary's runtime lookup and keeps the working directory clean.
 
 ---
 
@@ -306,7 +306,7 @@ Reticulum builds path tables reactively via cryptographically signed announces. 
 
 ---
 
-### 11. Build Instructions (`build.sh`)
+### 11. Build Instructions (`build_mips_be.sh`)
 
 ```bash
 # Install prerequisites on Ubuntu/Debian x86_64 host
@@ -317,13 +317,13 @@ rustup toolchain install nightly
 rustup component add rust-src --toolchain nightly
 
 # Standard incremental build (~2-3 seconds)
-./build.sh
+./build_mips_be.sh
 
 # Build with extreme binary stripping
-./build.sh --sstrip
+./build_mips_be.sh --sstrip
 
 # Complete clean build
-./build.sh --clean
+./build_mips_be.sh --clean
 ```
 
 ---
@@ -443,7 +443,7 @@ All paths, names, and network addresses are illustrative. Systems vary depending
 > До оригінальної кодової бази `leviculum` було внесено суттєві архітектурні зміни та оптимізації для роботи на 32-бітних процесорах MIPS без апаратного FPU. Через це **вихідний код ядра більше не є сумісним із поточною гілкою master батьківського репозиторію Leviculum**. Модифіковане ядро Rust постачається безпосередньо у складі цього репозиторію (каталог `leviculum/`) разом із C-оболонкою `clevnode.c` та складальними скриптами.
 >
 > **Актуальність вихідного коду:**  
-> Найновіші та найактуальніші виправлення, оптимізації пам'яті та патчі стабільності підтримуються безпосередньо у вихідному коді репозиторію (гілка `main`). Готові скомпільовані бінарні файли в релізах GitHub фіксують окремі контрольні етапи та можуть відставати від поточного стану коду. Для отримання максимальної швидкодії та найсвіжіших виправлень рекомендується пряма компіляція з вихідних текстів за допомогою `./build.sh`.
+> Найновіші та найактуальніші виправлення, оптимізації пам'яті та патчі стабільності підтримуються безпосередньо у вихідному коді репозиторію (гілка `main`). Готові скомпільовані бінарні файли в релізах GitHub фіксують окремі контрольні етапи та можуть відставати від поточного стану коду. Для отримання максимальної швидкодії та найсвіжіших виправлень рекомендується пряма компіляція з вихідних текстів за допомогою `./build_mips_be.sh`.
 
 ---
 
@@ -493,7 +493,7 @@ All paths, names, and network addresses are illustrative. Systems vary depending
 > Під час тривалої роботи (місяці безперервної маршрутизації, збереження хешів дедуплікації та шляхів) для робочих файлів вузла необхідно **щонайменше 15 МБ вільного місця** на USB-флешці або диску роутера.
 
 > **Важливий нюанс із назвою каталогу:**  
-> Під час збірки скрипт `build.sh` створює конфігурацію в папці `clevnode/reticulum/config`. Під час перенесення на роутер (наприклад, у каталог `/tmp/mnt/sda1/home/lblogd/`) ця папка обов'язково має бути перейменована на **`.reticulum`** (із крапкою на початку).
+> Під час збірки скрипт `build_mips_be.sh` створює конфігурацію в папці `clevnode/reticulum/config`. Під час перенесення на роутер (наприклад, у каталог `/tmp/mnt/sda1/home/lblogd/`) ця папка обов'язково має бути перейменована на **`.reticulum`** (із крапкою на початку).
 
 ---
 
@@ -682,7 +682,7 @@ Reticulum спілкується з I2P через SAM API (порт `7656`). П
 
 ---
 
-### 11. Складання проєкту (`build.sh`)
+### 11. Складання проєкту (`build_mips_be.sh`)
 
 ```bash
 # Встановлення вимог на хості Ubuntu/Debian x86_64
@@ -693,13 +693,13 @@ rustup toolchain install nightly
 rustup component add rust-src --toolchain nightly
 
 # Швидке інкрементальне складання (~2-3 секунди)
-./build.sh
+./build_mips_be.sh
 
 # Складання з екстремальним стрипінгом sstrip
-./build.sh --sstrip
+./build_mips_be.sh --sstrip
 
 # Повне очищення та збирання з нуля
-./build.sh --clean
+./build_mips_be.sh --clean
 ```
 
 ---
@@ -819,7 +819,7 @@ esac
 > В оригинальную кодовую базу `leviculum` были внесены существенные архитектурные изменения, оптимизации и патчи для работы на 32-битных встраиваемых MIPS-процессорах без FPU. В связи с этим **исходный код ядра более не является обратно совместимым с актуальной веткой master репозитория Leviculum**. Модифицированные исходные коды Rust-ядра поставляются непосредственно в составе данного репозитория (каталог `leviculum/`) вместе с Си-оболочкой `clevnode.c` и скриптами сборки.
 >
 > **Актуальность исходного кода:**  
-> Самые свежие и последние изменения, оптимизации памяти и патчи стабильности находятся непосредственно в исходном коде репозитория (ветка `main`). Готовые скомпилированные бинарники в релизах GitHub фиксируют контрольные версии и могут отставать от текущего состояния разработки. Для получения наилучшей производительности и самых свежих исправлений рекомендуется самостоятельная сборка из исходников с помощью `./build.sh`.
+> Самые свежие и последние изменения, оптимизации памяти и патчи стабильности находятся непосредственно в исходном коде репозитория (ветка `main`). Готовые скомпилированные бинарники в релизах GitHub фиксируют контрольные версии и могут отставать от текущего состояния разработки. Для получения наилучшей производительности и самых свежих исправлений рекомендуется самостоятельная сборка из исходников с помощью `./build_mips_be.sh`.
 
 ---
 
@@ -869,7 +869,7 @@ esac
 > В условиях продолжительной работы (многомесячная маршрутизация, сохранение маршрутов, кэш дедупликации) для всех рабочих файлов узла на флешке роутера необходимо **не менее 15 МБ свободного места**.
 
 > **Важный нюанс по именованию директорий:**  
-> При сборке скрипт `build.sh` создает дефолтный конфиг в открытой папке `clevnode/reticulum/config` для локального удобства. При переносе на роутер (в рабочую директорию, например, `/tmp/mnt/sda1/home/lblogd/`) папка должна быть переименована в скрытую **`.reticulum`** (с точкой в начале), что полностью соответствует ожиданиям бинарника и не захламляет домашний каталог.
+> При сборке скрипт `build_mips_be.sh` создает дефолтный конфиг в открытой папке `clevnode/reticulum/config` для локального удобства. При переносе на роутер (в рабочую директорию, например, `/tmp/mnt/sda1/home/lblogd/`) папка должна быть переименована в скрытую **`.reticulum`** (с точкой в начале), что полностью соответствует ожиданиям бинарника и не захламляет домашний каталог.
 
 ---
 
@@ -1065,9 +1065,9 @@ Reticulum взаимодействует с I2P через SAM API (порт `76
 
 ---
 
-### 11. Сборка проекта (`build.sh`) и флаги компилятора
+### 11. Сборка проекта (`build_mips_be.sh`) и флаги компилятора
 
-Сборка полностью автоматизирована скриптом `build.sh` на хосте **Linux x86_64**.
+Сборка полностью автоматизирована скриптом `build_mips_be.sh` на хосте **Linux x86_64**.
 
 ```bash
 # Установка базовых инструментов на хосте Ubuntu/Debian
@@ -1078,13 +1078,13 @@ rustup toolchain install nightly
 rustup component add rust-src --toolchain nightly
 
 # Быстрая инкрементальная сборка (~2-3 секунды)
-./build.sh
+./build_mips_be.sh
 
 # Сборка со стриппингом секций sstrip
-./build.sh --sstrip
+./build_mips_be.sh --sstrip
 
 # Полная зачистка и пересборка с нуля
-./build.sh --clean
+./build_mips_be.sh --clean
 ```
 
 ---

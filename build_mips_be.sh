@@ -33,13 +33,13 @@ for arg in "$@"; do
 done
 
 echo "============================================"
-echo "[build.sh] Project root: ${PROJECT_ROOT}"
-echo "[build.sh] Options: clean=${ENABLE_CLEAN}, sstrip=${ENABLE_SSTRIP}"
+echo "[build_mips_be.sh] Project root: ${PROJECT_ROOT}"
+echo "[build_mips_be.sh] Options: clean=${ENABLE_CLEAN}, sstrip=${ENABLE_SSTRIP}"
 echo "============================================"
 
 # --- 0. Handle --clean flag ---
 if [ "$ENABLE_CLEAN" = true ]; then
-    echo "[build.sh] FULL CLEAN mode: removing all build artifacts, SDKs, and caches..."
+    echo "[build_mips_be.sh] FULL CLEAN mode: removing all build artifacts, SDKs, and caches..."
     rm -rf "${PROJECT_ROOT}/clevnode/clevnode"
     rm -rf "${PROJECT_ROOT}/clevnode/lblogd.toml"
     if [ -d "${PROJECT_ROOT}/clevnode/posts" ]; then find "${PROJECT_ROOT}/clevnode/posts" -type f ! -name "index.mu" -delete 2>/dev/null || true; fi
@@ -53,14 +53,14 @@ if [ "$ENABLE_CLEAN" = true ]; then
     rm -f "${PROJECT_ROOT}/leviculum/libunwind.a"
     rm -rf "${PROJECT_ROOT}/tools/openwrt-sdk-*"
     rm -f "${PROJECT_ROOT}/tools/sstrip"
-    echo "[build.sh] Clean complete. Starting fresh build..."
+    echo "[build_mips_be.sh] Clean complete. Starting fresh build..."
     echo ""
 fi
 
 # --- 1. Download OpenWrt SDK if needed ---
 SDK_DIR="${PROJECT_ROOT}/tools/openwrt-sdk-23.05.3-ath79-generic_gcc-12.3.0_musl.Linux-x86_64"
 if [ ! -d "$SDK_DIR" ]; then
-    echo "[build.sh] Downloading OpenWrt SDK (MIPS Big-Endian / ath79)..."
+    echo "[build_mips_be.sh] Downloading OpenWrt SDK (MIPS Big-Endian / ath79)..."
     mkdir -p "${PROJECT_ROOT}/tools"
     cd "${PROJECT_ROOT}/tools"
     
@@ -69,27 +69,27 @@ if [ ! -d "$SDK_DIR" ]; then
     BACKUP_URL="https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.3/targets/ath79/generic/openwrt-sdk-23.05.3-ath79-generic_gcc-12.3.0_musl.Linux-x86_64.tar.xz"
     # 
     if ! wget -c --tries=5 --timeout=30 --show-progress "$PRIMARY_URL"; then
-        echo "[build.sh] Primary download failed or interrupted. Switching to backup mirror..."
+        echo "[build_mips_be.sh] Primary download failed or interrupted. Switching to backup mirror..."
         # 
         if ! wget -c --tries=5 --timeout=30 --show-progress "$BACKUP_URL"; then
-            echo "[build.sh] Error: Failed to download SDK from both primary and backup sources."
+            echo "[build_mips_be.sh] Error: Failed to download SDK from both primary and backup sources."
             exit 1
         fi
     fi
 
-    echo "[build.sh] Extracting OpenWrt SDK..."
+    echo "[build_mips_be.sh] Extracting OpenWrt SDK..."
     tar -xf "$SDK_FILE"
     rm -f "$SDK_FILE"
     cd "${PROJECT_ROOT}"
-    echo "[build.sh] OpenWrt SDK downloaded and extracted."
+    echo "[build_mips_be.sh] OpenWrt SDK downloaded and extracted."
 else
-    echo "[build.sh] OpenWrt SDK already present, skipping download."
+    echo "[build_mips_be.sh] OpenWrt SDK already present, skipping download."
 fi
 
 # --- 2. Build sstrip tool (only if --sstrip was requested) ---
 if [ "$ENABLE_SSTRIP" = true ]; then
     if [ ! -f "${PROJECT_ROOT}/tools/sstrip" ]; then
-        echo "[build.sh] Building sstrip from ELFkickers..."
+        echo "[build_mips_be.sh] Building sstrip from ELFkickers..."
         mkdir -p "${PROJECT_ROOT}/tools"
         cd "${PROJECT_ROOT}/tools"
         wget -q --show-progress http://www.muppetlabs.com/~breadbox/pub/software/ELFkickers-3.2.tar.gz
@@ -100,18 +100,18 @@ if [ "$ENABLE_SSTRIP" = true ]; then
         gcc -O2 -I../elfrw sstrip.c ../elfrw/libelfrw.a -o ../../sstrip
         cd "${PROJECT_ROOT}/tools"
         rm -rf ELFkickers-3.2 ELFkickers-3.2.tar.gz
-        echo "[build.sh] sstrip built successfully."
+        echo "[build_mips_be.sh] sstrip built successfully."
         cd "${PROJECT_ROOT}"
     else
-        echo "[build.sh] sstrip tool already present, skipping build."
+        echo "[build_mips_be.sh] sstrip tool already present, skipping build."
     fi
 else
-    echo "[build.sh] sstrip option disabled (using standard strip)."
+    echo "[build_mips_be.sh] sstrip option disabled (using standard strip)."
 fi
 
 # --- 3. Generate .cargo/config.toml (only if missing to preserve Cargo cache) ---
 if [ ! -f "${PROJECT_ROOT}/leviculum/.cargo/config.toml" ]; then
-    echo "[build.sh] Generating .cargo/config.toml..."
+    echo "[build_mips_be.sh] Generating .cargo/config.toml..."
     mkdir -p "${PROJECT_ROOT}/leviculum/.cargo"
     cat << TOML_EOF > "${PROJECT_ROOT}/leviculum/.cargo/config.toml"
 [build]
@@ -147,7 +147,7 @@ fi
 cp -u "${SDK_DIR}/staging_dir/toolchain-mips_24kc_gcc-12.3.0_musl/lib/gcc/mips-openwrt-linux-musl/12.3.0/libgcc_eh.a" "${PROJECT_ROOT}/leviculum/libunwind.a"
 
 # --- 5. Generate clevnode/Makefile ---
-echo "[build.sh] Generating clevnode/Makefile..."
+echo "[build_mips_be.sh] Generating clevnode/Makefile..."
 {
   printf 'CC = %s\n' "${SDK_DIR}/staging_dir/toolchain-mips_24kc_gcc-12.3.0_musl/bin/mips-openwrt-linux-gcc"
   printf '\n'
@@ -187,21 +187,21 @@ echo "[build.sh] Generating clevnode/Makefile..."
 } > "${PROJECT_ROOT}/clevnode/Makefile"
 
 # --- 6. Compile Rust library (incremental build via Cargo) ---
-echo "[build.sh] Compiling Rust library (libleviculum.a)..."
+echo "[build_mips_be.sh] Compiling Rust library (libleviculum.a)..."
 cd "${PROJECT_ROOT}/leviculum"
 export PATH="${SDK_DIR}/staging_dir/toolchain-mips_24kc_gcc-12.3.0_musl/bin:${PATH}"
 cargo +nightly build --target mips-unknown-linux-musl --release -p leviculum-ffi -Zbuild-std
 cd "${PROJECT_ROOT}"
 
 # --- 7. Compile C monolith (clevnode) ---
-echo "[build.sh] Compiling C monolith (clevnode)..."
+echo "[build_mips_be.sh] Compiling C monolith (clevnode)..."
 cd "${PROJECT_ROOT}/clevnode"
 cp -u ../leviculum/target/mips-unknown-linux-musl/release/libleviculum.a ./libleviculum.a
 make
 cd "${PROJECT_ROOT}"
 
 # --- 8. Create runtime configuration files & directories ---
-echo "[build.sh] Preparing runtime directories and default configs..."
+echo "[build_mips_be.sh] Preparing runtime directories and default configs..."
 mkdir -p "${PROJECT_ROOT}/clevnode/posts"
 mkdir -p "${PROJECT_ROOT}/clevnode/files"
 mkdir -p "${PROJECT_ROOT}/clevnode/identities"
@@ -245,12 +245,12 @@ INI_EOF
 fi
 
 # --- 9. Cleanup build artifacts ---
-echo "[build.sh] Build complete. Preserving caches for incremental compilation."
+echo "[build_mips_be.sh] Build complete. Preserving caches for incremental compilation."
 
 # --- Done ---
 echo ""
 echo "============================================"
-echo "[build.sh] BUILD COMPLETED SUCCESSFULLY!"
+echo "[build_mips_be.sh] BUILD COMPLETED SUCCESSFULLY!"
 echo "============================================"
 echo ""
 echo "Binary info:"
