@@ -19,62 +19,62 @@ jobs:
         include:
           - target: mips-unknown-linux-musl
             arch: mips-ath79-bigendian
-            toolchain_url: https://musl.cc/mips-linux-muslsf-cross.tgz
-            toolchain_dir: mips-linux-muslsf-cross
-            cc: mips-linux-muslsf-gcc
-            strip: mips-linux-muslsf-strip
+            toolchain_url: https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/x86_64-mips-linux-musl.tar.xz
+            toolchain_dir: mips-linux-musl
+            cc: mips-linux-musl-gcc
+            strip: mips-linux-musl-strip
             cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared
-            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-mips-static
 
           - target: mipsel-unknown-linux-musl
             arch: mipsel-ramips-littleendian
-            toolchain_url: https://musl.cc/mipsel-linux-muslsf-cross.tgz
-            toolchain_dir: mipsel-linux-muslsf-cross
-            cc: mipsel-linux-muslsf-gcc
-            strip: mipsel-linux-muslsf-strip
+            toolchain_url: https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/x86_64-mipsel-linux-musl.tar.xz
+            toolchain_dir: mipsel-linux-musl
+            cc: mipsel-linux-musl-gcc
+            strip: mipsel-linux-musl-strip
             cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared
-            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-mipsel-static
 
           - target: armv7-unknown-linux-musleabihf
             arch: armv7-cortexa7-hardfloat
-            toolchain_url: https://musl.cc/armv7l-linux-musleabihf-cross.tgz
-            toolchain_dir: armv7l-linux-musleabihf-cross
+            toolchain_url: https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/x86_64-armv7l-linux-musleabihf.tar.xz
+            toolchain_dir: armv7l-linux-musleabihf
             cc: armv7l-linux-musleabihf-gcc
             strip: armv7l-linux-musleabihf-strip
             cflags: -Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-ident -fno-stack-protector -fomit-frame-pointer
-            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-arm-static
 
           - target: aarch64-unknown-linux-musl
             arch: arm64-aarch64
-            toolchain_url: https://musl.cc/aarch64-linux-musl-cross.tgz
-            toolchain_dir: aarch64-linux-musl-cross
+            toolchain_url: https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/x86_64-aarch64-linux-musl.tar.xz
+            toolchain_dir: aarch64-linux-musl
             cc: aarch64-linux-musl-gcc
             strip: aarch64-linux-musl-strip
             cflags: -Os -march=armv8-a -fno-ident -fno-stack-protector -fomit-frame-pointer
-            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-aarch64-static
 
           - target: x86_64-unknown-linux-musl
             arch: x86_64-generic
-            toolchain_url: https://musl.cc/x86_64-linux-musl-cross.tgz
-            toolchain_dir: x86_64-linux-musl-cross
+            toolchain_url: https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/x86_64-x86_64-linux-musl.tar.xz
+            toolchain_dir: x86_64-linux-musl
             cc: x86_64-linux-musl-gcc
             strip: x86_64-linux-musl-strip
             cflags: -Os -march=x86-64 -fno-ident -fno-stack-protector -fomit-frame-pointer
-            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: ""
 
           - target: i686-unknown-linux-musl
             arch: i686-x86-32bit
-            toolchain_url: https://musl.cc/i686-linux-musl-cross.tgz
-            toolchain_dir: i686-linux-musl-cross
+            toolchain_url: https://github.com/userdocs/qbt-musl-cross-make/releases/latest/download/x86_64-i686-linux-musl.tar.xz
+            toolchain_dir: i686-linux-musl
             cc: i686-linux-musl-gcc
             strip: i686-linux-musl-strip
             cflags: -Os -march=i686 -fno-ident -fno-stack-protector -fomit-frame-pointer
-            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -lgcc_eh -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
+            ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-i386-static
 
     steps:
@@ -84,7 +84,7 @@ jobs:
       - name: Install QEMU User Static Emulation
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq qemu-user-static zip
+          sudo apt-get install -y -qq qemu-user-static zip xz-utils
 
       - name: Install Rust Nightly Toolchain
         run: |
@@ -96,16 +96,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: toolchains/${{ matrix.toolchain_dir }}
-          key: toolchain-${{ matrix.toolchain_dir }}-v1
+          key: toolchain-${{ matrix.toolchain_dir }}-v2
 
       - name: Download Musl Toolchain
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
           mkdir -p toolchains
           cd toolchains
-          curl --retry 3 --retry-delay 5 -fSL "${{ matrix.toolchain_url }}" -o toolchain.tgz
-          tar -xf toolchain.tgz
-          rm -f toolchain.tgz
+          curl --retry 3 --retry-delay 5 -fSL "${{ matrix.toolchain_url }}" -o toolchain.tar.xz
+          tar -xf toolchain.tar.xz
+          rm -f toolchain.tar.xz
 
       - name: Build Rust static core (libleviculum.a)
         run: |
