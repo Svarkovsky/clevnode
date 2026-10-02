@@ -4,7 +4,7 @@
 <br>
 
 <p align="center">
-  <strong>High-performance Reticulum node for embedded MIPS devices</strong>
+  <strong>High-performance standalone Reticulum node & NomadNet server for embedded Linux devices, routers, SBCs, and servers</strong>
 </p>
 
 ---
@@ -17,7 +17,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-green?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/platform-MIPS_Big--Endian-orange?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-MIPS%20|%20ARM%20|%20x86-orange?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/RAM-3.7_MB_start_/_18.5_--_22.0_MB_load-brightgreen?style=flat-square" alt="RAM">
   <img src="https://img.shields.io/badge/binary-2.43_MB-blue?style=flat-square" alt="Binary">
   <img src="https://img.shields.io/badge/uptime-50+_hours_continuous-brightgreen?style=flat-square" alt="Uptime">
@@ -27,7 +27,7 @@
 
 <a id="english"></a>
 
-`clevnode` is an optimized standalone hybrid monolith (pure C + static Rust library) designed for continuous operation as a gateway and transit router of the Reticulum network, as well as a lightweight NomadNet (Micron) page server on embedded devices with severely constrained hardware resources (`MIPS` `Big-Endian`, 64 - 128 MB RAM).
+`clevnode` is an optimized standalone hybrid monolith (pure C + static Rust library) designed for continuous 24/7 operation as a gateway and transit router of the Reticulum network, as well as a lightweight NomadNet (Micron) page server on resource-constrained embedded routers, single-board computers (SBCs), and Linux servers (MIPS, MIPSEL, ARMv7, ARM64, x86_64, i686).
 
 <table align="center">
   <tr>
@@ -44,7 +44,7 @@
 
 #### Supported Features in the Current Codebase:
 - **Full Reticulum Stack:** Packet routing, link establishment (Links), announces, and path building.
-- **Asynchronous Rust Core (`leviculum`):** Optimized for 32-bit MIPS Big-Endian architectures without an FPU,`-msoft-float`.
+- **Asynchronous Rust Core (`leviculum`):** Cross-compiled with static `musl libc`, featuring dedicated low-level optimizations for 32-bit embedded architectures without an FPU (`-msoft-float`), as well as full native support for modern ARM and x86 systems.
 - **C Monolith (`clevnode.c`):** Asynchronous worker, task queue for request processing, and pre-caching of MsgPack pages in RAM.
 - **Traffic Transports:** Operates as a transit node and gateway via the persistent I2P SAM Bridge (port 7656).
 - **NomadNet / Micron:** Serves lightweight pages (requests for `/page/index.mu`) with automatic fallback to multi-part Resource transfers when the page size exceeds the packet MTU.
@@ -70,7 +70,7 @@ The project is distributed under the terms of the **AGPL-3.0-or-later** license 
 
 ### 2. Real Resource Consumption Figures & Long-Term Telemetry
 
-System metrics were measured directly on a physical **ASUS RT-AC57U V3** router (Qualcomm Atheros QCA9563 CPU, MIPS 74Kc 775 MHz, 128 MB RAM, Linux kernel 3.4.103-rt119) under sustained real-world Reticulum, clearnet, and I2P traffic (PID 6833).
+Note: System metrics in the tables below were measured directly on real MIPS hardware: a physical **ASUS RT-AC57U V3** router (Qualcomm Atheros QCA9563 SoC, 32-bit MIPS 74Kc 775 MHz, 128 MB RAM, OpenWrt ath79, Linux kernel 3.4.103-rt119) operating 24/7 under sustained multi-peer Reticulum, clearnet, and I2P traffic with 5,000 active network identities and 18,000+ deduplication hashes.
 
 #### Long-Term Stability Telemetry (Continuous Uptime):
 * **Process Uptime:** 198,000 seconds (over 55.0 hours of uninterrupted execution).
@@ -203,8 +203,8 @@ Official standalone static release archives are compiled and verified via QEMU f
 * **Hardware FPU:** Not required on MIPS/MIPSEL; soft-float math is statically linked (`-msoft-float`).
 * **Kernel Compatibility:** Compiled with `musl libc`, which requires a minimum of **Linux 2.6.39**. While 2.6.39 has not been validated on physical hardware, it is expected to function thanks to the Linux syscall ABI stability. **Fully verified on Linux kernel 3.4.103-rt119**. Modern kernels (4.x, 5.x, 6.x) are supported natively.
 
-> **Porting to Other Architectures:**  
-> Currently, official pre-built binaries target MIPS Big-Endian. However, porting `clevnode` to **`mipsel` (MediaTek/Ralink), ARMv7, ARM64 (AArch64), or RISC-V** requires minimal effort-chiefly changing toolchain definitions and running `cargo` with the respective musl target. Feel free to open an issue or contribute!
+> **Automated Multi-Architecture Releases:**  
+> Standalone static release archives with pre-release QEMU execution verification are automatically compiled and published for all 6 target architectures in GitHub Releases.
 
 ---
 
@@ -415,15 +415,15 @@ All paths, names, and network addresses are illustrative. Systems vary depending
 
 <a id="ukrainian"></a>
 
-### Високопродуктивний вузол Reticulum для вбудованих MIPS-пристроїв
+### Високопродуктивний автономний вузол Reticulum та сервер NomadNet для вбудованих пристроїв, роутерів та серверів
 
-`clevnode` - це оптимізований автономний гібридний моноліт (чистий C + статична бібліотека Rust), розроблений для цілодобової роботи як шлюз і транзитний маршрутизатор мережі Reticulum, а також легковаговий сервер сторінок NomadNet (Micron) на вбудованих пристроях з обмеженими ресурсами (MIPS Big-Endian, 64–128 МБ RAM).
+`clevnode` - це оптимізований автономний гібридний моноліт (чистий C + статична бібліотека Rust), розроблений для цілодобової роботи як шлюз і транзитний маршрутизатор мережі Reticulum, а також легковаговий сервер сторінок NomadNet (Micron) на вбудованих роутерах, одноплатних комп'ютерах (SBC) та серверах з обмеженими ресурсами (MIPS, MIPSEL, ARMv7, ARM64, x86_64, i686).
 
 **Етимологія:** **C-Lev-Node** = **C** (швидка C-оболонка) + **Lev**iculum (мережеве ядро) + **Node** (автономний вузол). Гра слів: **Clever Node** («Розумний вузол»).
 
 #### Підтримувані можливості в поточній кодовій базі:
 - **Повноцінний стек Reticulum:** маршрутизація пакетів, встановлення з'єднань (Links), анонси та побудова шляхів.
-- **Асинхронне Rust-ядро (`leviculum`):** оптимізоване під архітектуру MIPS32 Big-Endian (без FPU) з використанням `-msoft-float`.
+- **Асинхронне Rust-ядро (`leviculum`):** статично скомпільоване з `musl libc`, із глибокими низькорівневими оптимізаціями для 32-бітних архітектур без FPU (`-msoft-float`) та повною підтримкою сучасних платформ ARM та x86.
 - **C-моноліт (`clevnode.c`):** асинхронний воркер, черга задач для обробки записів, прекешування MsgPack-сторінок в ОЗУ.
 - **Носії трафіку (Транспорт):** робота як транзитного вузла та шлюзу через I2P SAM Bridge (порт 7656).
 - **NomadNet / Micron:** обслуговування легковагових сторінок (запити `/page/index.mu`) з автоматичною передачею великих сторінок у вигляді складених ресурсів (Resources) при перевищенні MTU.
@@ -449,7 +449,7 @@ All paths, names, and network addresses are illustrative. Systems vary depending
 
 ### 2. Реальні показники споживання ресурсів і тривала телеметрія
 
-Вимірювання проводилися безпосередньо на фізичному роутері **ASUS RT-AC57U V3** (процесор Qualcomm Atheros QCA9563, MIPS 74Kc 775 МГц, 128 МБ RAM, ядро Linux 3.4.103-rt119) під реальним мережевим навантаженням трафіку Reticulum, клірнету та I2P (PID 6833).
+Примітка: Усі показники пам'яті, процесора та системних ресурсів у таблицях нижче виміряні безпосередньо на реальному MIPS-обладнанні - фізичному роутері **ASUS RT-AC57U V3** (процесор Qualcomm Atheros QCA9563, 32-бітний MIPS 74Kc 775 МГц, 128 МБ RAM, OpenWrt ath79, ядро Linux 3.4.103-rt119) під безперервним цілодобовим навантаженням 24/7 (20-30 пірів Reticulum, клірнет та I2P, 5 000 ідентичностей у базі та 18 000+ дедуплікаційних хешів).
 
 #### Телеметрія тривалої стабільності (Uptime):
 * **Час безперервної роботи процесу:** 198 000 секунд (понад 55,0 годин безперервного виконання).
@@ -582,8 +582,8 @@ All paths, names, and network addresses are illustrative. Systems vary depending
 * **Апаратний FPU:** Не потрібен на MIPS/MIPSEL; розрахунки ведуться програмно завдяки `-msoft-float`.
 * **Сумісність з ядрами Linux:** Бінарник зібраний із `musl libc`, яка потребує ядра **Linux 2.6.39 або новішого**. На версії 2.6.39 робота прямо не перевірялася, але має забезпечуватися стабільністю системних викликів. **Підтверджено бездоганну роботу на ядрі 3.4.103-rt119**. Ядра 4.x, 5.x та 6.x підтримуються архітектурно.
 
-> **Плани щодо перенесення:**  
-> Зараз офіційно підтримується MIPS Big-Endian. Проте код легко адаптується під **`mipsel` (MediaTek), ARMv7, ARM64 або RISC-V** - достатньо підставити відповідний крос-компілятор у `build.sh`. Усе залежить від вашого інтересу та запитів спільноти.
+> **Автоматичні мультиплатформенні релізи:**  
+> Автономні статичні релізні архіви із верифікацією запуску через QEMU автоматично збираються та публікуються для всіх 6 цільових архітектур у розділі GitHub Releases.
 
 ---
 
@@ -791,15 +791,15 @@ esac
 
 <a id="russian"></a>
 
-### Высокопроизводительный узел Reticulum для встраиваемых MIPS-устройств
+### Высокопроизводительный автономный узел Reticulum и сервер NomadNet для встраиваемых устройств, роутеров и серверов
 
-`clevnode` - это оптимизированный автономный гибридный монолит (чистый Си + статическая библиотека на Rust), созданный для постоянной работы в качестве шлюза и транзитного маршрутизатора сети Reticulum, а также легковесного сервера страниц NomadNet (Micron) на встраиваемых устройствах с жестко ограниченными аппаратными ресурсами (MIPS Big-Endian, 64–128 МБ RAM).
+`clevnode` - это оптимизированный автономный гибридный монолит (чистый Си + статическая библиотека на Rust), созданный для постоянной круглосуточной работы в качестве шлюза и транзитного маршрутизатора сети Reticulum, а также легковесного сервера страниц NomadNet (Micron) на встраиваемых роутерах, микрокомпьютерах (SBC) и серверах (MIPS, MIPSEL, ARMv7, ARM64, x86_64, i686).
 
 *Этимология:* **C-Lev-Node** = **C** (производительная Си-оболочка) + **Lev**iculum (сетевой стек) + **Node** (автономный узел). Дополнительная смысловая игра слов: **Clever Node** («Умный узел»).
 
 #### Поддерживаемые возможности в текущей кодовой базе:
 - **Полноценный стек Reticulum:** маршрутизация пакетов, установление соединений (Links), анонсы и построение путей.
-- **Асинхронное Rust-ядро (`leviculum`):** оптимизированное под архитектуру MIPS32 Big-Endian (без FPU) с использованием `-msoft-float`.
+- **Асинхронное Rust-ядро (`leviculum`):** статически скомпилированное с `musl libc`, с глубокими низкоуровневыми оптимизациями для 32-битных встраиваемых платформ без FPU (`-msoft-float`) и полноценной поддержкой современных процессоров ARM и x86.
 - **C-монолит (`clevnode.c`):** асинхронный воркер, очередь задач для обработки запросов, прекэширование MsgPack-страниц в ОЗУ.
 - **Носителели трафика (Транспорт):** работа в качестве транзитного узла и шлюза через I2P SAM Bridge (порт 7656).
 - **NomadNet / Micron:** обслуживание легковесных страниц (запросы `/page/index.mu`) с автоматической передачей больших страниц в виде составных ресурсов (Resources) при превышении MTU.
@@ -825,7 +825,7 @@ esac
 
 ### 2. Реальные показатели потребления ресурсов и длительная телеметрия
 
-Замеры системных метрик производились непосредственно на физическом роутере **ASUS RT-AC57U V3** (процессор Qualcomm Atheros QCA9563, MIPS 74Kc 775 МГц, 128 МБ RAM, ядро Linux 3.4.103-rt119) под непрерывным реальным сетевым трафиком Reticulum, клирнета и I2P (PID 6833).
+Примечание: Все показатели памяти, процессора и системных ресурсов в таблицах ниже измерены непосредственно на реальном MIPS-оборудовании - физическом роутере **ASUS RT-AC57U V3** (процессор Qualcomm Atheros QCA9563, 32-битный MIPS 74Kc 775 МГц, 128 МБ RAM, OpenWrt ath79, ядро Linux 3.4.103-rt119) под непрерывной круглосуточной нагрузкой 24/7 (20-30 пиров Reticulum, клирнет и I2P, 5 000 адресатов в базе и 18 000+ дедупликационных хешей).
 
 #### Телеметрия непрерывной работы (Uptime):
 * **Время работы процесса `clevnode`:** 198 000 секунд (свыше 55,0 часов непрерывного исполнения).
@@ -961,8 +961,8 @@ esac
   *На ядрах 2.6.39 работа напрямую не проверялась*, однако теоретически бинарник должен запускаться на любых ядрах от 2.6.39 и новее благодаря правилу ядра Linux «never break userspace» и стабильности ABI системных вызовов.  
   **Фактически подтверждена стабильная работа на ядре 3.4.103-rt119 (ASUS RT-AC57U V3)**. На ядрах 4.x, 5.x и 6.x работа гарантируется архитектурой статической сборки.
 
-> **О переносе на другие платформы:**  
-> Сейчас доступна прямая поддержка только MIPS Big-Endian. Однако при наличии интереса со стороны сообщества проект может быть адаптирован под **`mipsel` (MediaTek), ARMv7, ARM64 или RISC-V** - для этого достаточно настроить соответствующий тулчейн и цель `cargo`. Всё зависит от вашего желания, свободного времени и реальных потребностей. Буду рад вашей поддержке!
+> **Автоматические мультиплатформенные релизы:**  
+> Автономные статические релизные архивы с предварительной верификацией запуска через QEMU автоматически собираются и публикуются для всех 6 целевых архитектур в разделе GitHub Releases.
 
 ---
 
