@@ -3,12 +3,16 @@ set -e
 
 BINARY="${1:?Binary path required}"
 ARCH="${2:?Architecture name required}"
-VERSION="${3:-v0.1.1-dev}"
+VERSION="${3:-v0.1.1}"
 OUT_DIR="${4:-Releases}"
+CFLAGS_INFO="${5:-Not specified}"
+LDFLAGS_INFO="${6:-Not specified}"
+TARGET_TRIPLE="${7:-Not specified}"
+CC_NAME="${8:-gcc}"
+TOOLCHAIN_INFO="${9:-musl-cross-make}"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Ensure OUT_DIR is absolute
 case "$OUT_DIR" in
     /*) TARGET_DIR="$OUT_DIR" ;;
     *)  TARGET_DIR="$PROJECT_ROOT/$OUT_DIR" ;;
@@ -70,11 +74,29 @@ esac
 STARTUP
 chmod +x "$STAGE_DIR/S90clevnode"
 
+cat << BUILD_INFO > "$STAGE_DIR/build_info.txt"
+Package: clevnode
+Version: ${VERSION}
+Target Triple: ${TARGET_TRIPLE}
+Architecture Name: ${ARCH}
+Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+Compilation Flags:
+  CFLAGS:  ${CFLAGS_INFO}
+  LDFLAGS: ${LDFLAGS_INFO}
+  Rust:    cargo +nightly -Zbuild-std=std,panic_abort -Zbuild-std-features=optimize_for_size --release
+
+Toolchain Details:
+  Compiler: ${CC_NAME}
+  Info:     ${TOOLCHAIN_INFO}
+  C Library: musl libc (static linkage)
+BUILD_INFO
+
 (
     cd "$STAGE_DIR"
     find . -type f ! -name "md5sums.txt" -print0 | xargs -0 md5sum > md5sums.txt
     ZIP_NAME="clevnode-${VERSION}-${ARCH}-static.zip"
-    zip -r "$TARGET_DIR/$ZIP_NAME" clevnode .reticulum posts S90clevnode md5sums.txt >/dev/null
+    zip -r "$TARGET_DIR/$ZIP_NAME" clevnode .reticulum posts S90clevnode build_info.txt md5sums.txt >/dev/null
     cd "$TARGET_DIR"
     md5sum "$ZIP_NAME" > "$ZIP_NAME.md5"
     echo "Packaged $TARGET_DIR/$ZIP_NAME"

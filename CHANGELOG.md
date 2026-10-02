@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.1.1] - 2026-10-02
 
 ### Multi-Architecture & CI/CD
 - **Automated Multi-Target CI Pipeline:** Implemented automated cross-compilation in `.github/workflows/release.yml` with pre-release verification using QEMU user-mode emulation across 6 architectures:

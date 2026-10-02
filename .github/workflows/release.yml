@@ -140,9 +140,21 @@ jobs:
 
       - name: Package Distribution Archive
         run: |
-          VERSION="${GITHUB_REF_NAME:-v0.1.1-dev}"
+          VERSION="${GITHUB_REF_NAME:-v0.1.1}"
+          TOOLCHAIN_BIN="$GITHUB_WORKSPACE/toolchains/${{ matrix.toolchain_dir }}/bin"
+          CC_VER=$("${TOOLCHAIN_BIN}/${{ matrix.cc }}" --version | head -n 1)
+          RUST_VER=$(rustc --version)
           chmod +x scripts/package_target.sh
-          ./scripts/package_target.sh clevnode/clevnode "${{ matrix.arch }}" "$VERSION" Releases
+          ./scripts/package_target.sh \
+            clevnode/clevnode \
+            "${{ matrix.arch }}" \
+            "$VERSION" \
+            Releases \
+            "${{ matrix.cflags }}" \
+            "${{ matrix.ldflags }}" \
+            "${{ matrix.target }}" \
+            "${{ matrix.cc }}" \
+            "$CC_VER | $RUST_VER"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -173,8 +185,45 @@ jobs:
           find dist/ -type f \( -name "*.zip" -o -name "*.md5" \) -exec cp {} release_assets/ \;
           ls -la release_assets/
 
+      - name: Generate Release Notes
+        run: |
+          cat << 'NOTES' > release_notes.md
+          ## What's Changed in v0.1.1
+
+          ### Multi-Architecture Builds
+          Official standalone static release archives compiled against `musl libc` with pre-release QEMU execution verification for 6 hardware architectures:
+          - **mips-ath79-bigendian** (`mips-unknown-linux-musl`): Qualcomm Atheros AR9xxx/QCA95xx (OpenWrt `ath79`, soft-float).
+          - **mipsel-ramips-littleendian** (`mipsel-unknown-linux-musl`): MediaTek/Ralink MT7620/MT7621/MT7628 (OpenWrt/Keenetic `ramips`, soft-float).
+          - **armv7-cortexa7-hardfloat** (`armv7-unknown-linux-musleabihf`): Cortex-A7/A9, Raspberry Pi 2 / Zero 2W, Orange Pi (hard-float).
+          - **arm64-aarch64** (`aarch64-unknown-linux-musl`): Cortex-A53/A72, Raspberry Pi 3/4/5, modern ARM routers and servers.
+          - **x86_64-generic** (`x86_64-unknown-linux-musl`): 64-bit Intel / AMD servers, PC, and VPS.
+          - **i686-x86-32bit** (`i686-unknown-linux-musl`): 32-bit x86 legacy hardware and thin clients.
+
+          ### Architecture & Resource Optimizations
+          - **Unified Tokio Runtime:** Consolidated FFI event bridge and driver network I/O into a single shared Tokio worker (`reticulum-node`). Reduced permanent OS threads from 5-6 down to exactly 3.
+          - **Clamped Thread Stacks:** Worker stack bounded to 128 KB via `thread_stack_size(128 * 1024)`. Virtual memory address space (`VmSize`) reduced from 33.2 MB to 19.8 - 25.0 MB, and peak memory spike (`VmPeak`) dropped from 47.8 MB to ~27.5 MB.
+          - **Traffic Counter Thread Elimination:** Gated background 1-second polling thread under `#[cfg(feature = "rpc")]`.
+          - **MIPS Hardware Acceleration:** Configured `opt-level = 3` for Curve25519/Ed25519/X25519 in release profile, unrolling 32-bit field multiplications for a 30-40% speedup on MIPS without FPU.
+          - **Fast Packet Deduplication:** Replaced SipHash-1-3 in packet cache with zero-overhead `FastHashBuilder` (direct 8-byte prefix lookup on SHA-256 digests).
+          - **Dead-Weight Elimination:** Removed regex dependencies (`regex-automata`, `regex-syntax`), isolated unused interface drivers (`kiss`, `pipe`, `rnode`, `serial`), and optionalized `serde_json`.
+
+          ### Compilation Flags & Toolchain Matrix
+          | Architecture | Target Triple | CFLAGS | LDFLAGS | C Library | Linker |
+          |---|---|---|---|---|---|
+          | **MIPS Big-Endian** | `mips-unknown-linux-musl` | `-Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared -no-pie` | `-static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL` | `musl 1.2.5` | GNU ld |
+          | **MIPSEL Little-Endian** | `mipsel-unknown-linux-musl` | `-Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared -no-pie` | `-static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL` | `musl 1.2.5` | GNU ld |
+          | **ARMv7-A 32-bit** | `armv7-unknown-linux-musleabihf` | `-Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-ident -fno-stack-protector -fomit-frame-pointer` | `-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL` | `musl 1.2.5` | GNU ld |
+          | **ARM64 / AArch64** | `aarch64-unknown-linux-musl` | `-Os -march=armv8-a -fno-ident -fno-stack-protector -fomit-frame-pointer` | `-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL` | `musl 1.2.5` | GNU ld |
+          | **x86_64** | `x86_64-unknown-linux-musl` | `-Os -march=x86-64 -fno-ident -fno-stack-protector -fomit-frame-pointer` | `-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL` | `musl 1.2.5` | GNU ld |
+          | **i686 32-bit** | `i686-unknown-linux-musl` | `-Os -march=i686 -fno-ident -fno-stack-protector -fomit-frame-pointer` | `-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL` | `musl 1.2.5` | GNU ld |
+
+          All targets compiled with Rust Nightly (`-Zbuild-std=std,panic_abort -Zbuild-std-features=optimize_for_size`).
+          Each distribution ZIP contains `build_info.txt` with exact compilation flags, tools, and md5 checksums.
+          NOTES
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: clevnode v0.1.1
+          body_path: release_notes.md
           files: release_assets/*
-          generate_release_notes: true
