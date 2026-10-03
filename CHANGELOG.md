@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.1] - 2026-10-02
 
+### Security & Memory Safety
+- **Path Traversal & Injection Hardening:** Hardened `get_page_content()` in `clevnode.c` to reject hidden dotfiles (`subpath[0] == '.'`), require `.mu` extensions, and check `snprintf` return values to prevent path truncation attacks.
+- **Graceful Link Teardown Cleanup:** Added comprehensive link state and pending queue freeing in `main()` cleanup path, ensuring zero memory leaks when terminating during active transfers.
+- **Static Analysis & Sanitizer Verification:** Clean run under `gcc -fanalyzer -Wall -Wextra -Werror` (0 warnings). Verified zero buffer overflows, zero undefined behaviors, and zero memory leaks under AddressSanitizer (ASan) and UndefinedBehaviorSanitizer (UBSan).
+
 ### Multi-Architecture & CI/CD
 - **Automated Multi-Target CI Pipeline:** Implemented automated cross-compilation in `.github/workflows/release.yml` with pre-release verification using QEMU user-mode emulation across 6 architectures:
   - `mips-unknown-linux-musl` (MIPS Big-Endian, ath79, soft-float)

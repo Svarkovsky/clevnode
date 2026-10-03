@@ -89,7 +89,7 @@ static void resolve_paths(void) {
 static void handle_signal(int sig, siginfo_t *info, void *ucontext) {
     (void)ucontext;
     pid_t sender_pid = info ? info->si_pid : -1;
-    uid_t sender_uid = info ? info->si_uid : -1;
+    uid_t sender_uid = info ? info->si_uid : (uid_t)0;
 
     const char *sig_name = "UNKNOWN";
     if (sig == SIGTERM) sig_name = "SIGTERM";
@@ -489,7 +489,7 @@ static void sync_page_registration(leviculum_t *node, const uint8_t *dest_hash, 
         if (entry->d_name[0] == '.') continue;
         size_t nlen = strlen(entry->d_name);
         if (nlen > 3 && strcmp(entry->d_name + nlen - 3, ".mu") == 0) {
-            char req_path[256];
+            char req_path[320];
             snprintf(req_path, sizeof(req_path), "/page/%s", entry->d_name);
             lev_register_request_handler(node, dest_hash, req_path, LEV_REQUEST_POLICY_ALLOW_ALL, NULL, 0);
         }
@@ -513,17 +513,31 @@ static uint8_t *get_page_content(const char *req_path, const char *posts_dir, si
         return NULL;
     }
 
-    /* Path traversal protection */
+    /* Path traversal & security protection */
     if (strstr(subpath, "..") != NULL || strchr(subpath, '/') != NULL || strchr(subpath, '\\') != NULL) {
         fprintf(stderr, "[clevnode] Security: rejected traversal path: %s\n", req_path);
         return NULL;
     }
-    if (strlen(subpath) == 0 || strlen(subpath) > 120) {
+    /* Reject hidden files (e.g. .hidden.mu, .env, .git) */
+    if (subpath[0] == '.') {
+        fprintf(stderr, "[clevnode] Security: rejected hidden file path: %s\n", req_path);
+        return NULL;
+    }
+    size_t sub_len = strlen(subpath);
+    if (sub_len == 0 || sub_len > 120) {
+        return NULL;
+    }
+    /* Must end with .mu */
+    if (sub_len < 3 || strcmp(subpath + sub_len - 3, ".mu") != 0) {
+        fprintf(stderr, "[clevnode] Security: rejected non-.mu extension: %s\n", req_path);
         return NULL;
     }
 
     char filepath[512];
-    snprintf(filepath, sizeof(filepath), "%s/%s", posts_dir, subpath);
+    int n = snprintf(filepath, sizeof(filepath), "%s/%s", posts_dir, subpath);
+    if (n < 0 || (size_t)n >= sizeof(filepath)) {
+        return NULL;
+    }
 
     struct stat st;
     if (stat(filepath, &st) != 0 || !S_ISREG(st.st_mode)) {
@@ -764,7 +778,7 @@ int main(int argc, char **argv) {
         goto cleanup;
     }
 
-    char config_path[512], storage_path[512];
+    char config_path[4096 + 32], storage_path[4096 + 32];
     snprintf(config_path, sizeof(config_path), "%s/config", config_dir);
     snprintf(storage_path, sizeof(storage_path), "%s/storage", config_dir);
 
@@ -1061,6 +1075,24 @@ cleanup:
     if (site_id) {
         lev_identity_free(site_id);
     }
+    /* Free all link states */
+    pthread_mutex_lock(&links_mutex);
+    struct link_state *curr_ls = links;
+    while (curr_ls) {
+        struct link_state *next_ls = curr_ls->next;
+        struct pending_response *curr_p = curr_ls->queue_head;
+        while (curr_p) {
+            struct pending_response *next_p = curr_p->next;
+            if (curr_p->raw_page) free(curr_p->raw_page);
+            free(curr_p);
+            curr_p = next_p;
+        }
+        free(curr_ls);
+        curr_ls = next_ls;
+    }
+    links = NULL;
+    pthread_mutex_unlock(&links_mutex);
+
     for (int i = 0; i < PAGE_CACHE_MAX_SLOTS; i++) {
         if (page_cache[i].is_valid && page_cache[i].msgpack_data) {
             free(page_cache[i].msgpack_data);
