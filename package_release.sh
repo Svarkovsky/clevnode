@@ -23,7 +23,7 @@ chmod +x "$PROJECT_ROOT/scripts/package_target.sh"
     "$ARCH" \
     "$VERSION" \
     "$PROJECT_ROOT/Releases" \
-    "-Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared -no-pie" \
+    "-Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -mno-shared -no-pie" \
     "-static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL" \
     "mips-unknown-linux-musl" \
     "mips-openwrt-linux-musl-gcc" \

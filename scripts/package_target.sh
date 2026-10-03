@@ -84,7 +84,7 @@ Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 Compilation Flags:
   CFLAGS:  ${CFLAGS_INFO}
   LDFLAGS: ${LDFLAGS_INFO}
-  Rust:    cargo +nightly -Zbuild-std=std,panic_abort -Zbuild-std-features=optimize_for_size --release
+  Rust:    cargo +nightly -C force-unwind-tables=no -C embed-bitcode=no -Zbuild-std=std,panic_abort -Zbuild-std-features=optimize_for_size --release
 
 Toolchain Details:
   Compiler: ${CC_NAME}

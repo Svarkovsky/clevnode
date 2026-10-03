@@ -23,7 +23,7 @@ jobs:
             toolchain_dir: mips-linux-musl
             cc: mips-linux-musl-gcc
             strip: mips-linux-musl-strip
-            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared -no-pie
+            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -mno-shared -no-pie
             ldflags: -static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-mips-static
 
@@ -33,7 +33,7 @@ jobs:
             toolchain_dir: mipsel-linux-musl
             cc: mipsel-linux-musl-gcc
             strip: mipsel-linux-musl-strip
-            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared -no-pie
+            cflags: -Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -mno-shared -no-pie
             ldflags: -static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-mipsel-static
 
@@ -43,7 +43,7 @@ jobs:
             toolchain_dir: armv7l-linux-musleabihf
             cc: armv7l-linux-musleabihf-gcc
             strip: armv7l-linux-musleabihf-strip
-            cflags: -Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-ident -fno-stack-protector -fomit-frame-pointer
+            cflags: -Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables
             ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-arm-static
 
@@ -53,7 +53,7 @@ jobs:
             toolchain_dir: aarch64-linux-musl
             cc: aarch64-linux-musl-gcc
             strip: aarch64-linux-musl-strip
-            cflags: -Os -march=armv8-a -fno-ident -fno-stack-protector -fomit-frame-pointer
+            cflags: -Os -march=armv8-a -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables
             ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-aarch64-static
 
@@ -63,7 +63,7 @@ jobs:
             toolchain_dir: x86_64-linux-musl
             cc: x86_64-linux-musl-gcc
             strip: x86_64-linux-musl-strip
-            cflags: -Os -march=x86-64 -fno-ident -fno-stack-protector -fomit-frame-pointer
+            cflags: -Os -march=x86-64 -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables
             ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: ""
 
@@ -73,7 +73,7 @@ jobs:
             toolchain_dir: i686-linux-musl
             cc: i686-linux-musl-gcc
             strip: i686-linux-musl-strip
-            cflags: -Os -march=i686 -fno-ident -fno-stack-protector -fomit-frame-pointer
+            cflags: -Os -march=i686 -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables
             ldflags: -static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL
             qemu: qemu-i386-static
 
@@ -108,6 +108,8 @@ jobs:
           rm -f toolchain.tar.xz
 
       - name: Build Rust static core (libleviculum.a)
+        env:
+          RUSTFLAGS: "-C force-unwind-tables=no -C embed-bitcode=no --remap-path-prefix=="
         run: |
           cd leviculum
           cargo +nightly build \
@@ -210,12 +212,12 @@ jobs:
           ### Compilation Flags & Toolchain Matrix
           | Architecture | Target Triple | CFLAGS | LDFLAGS | C&nbsp;Library | Linker |
           |---|---|---|---|:---:|:---:|
-          | **MIPS&nbsp;Big-Endian** | <sub>`mips-unknown-linux-musl`</sub> | <sub>`-Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared -no-pie`</sub> | <sub>`-static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
-          | **MIPSEL&nbsp;Little-Endian** | <sub>`mipsel-unknown-linux-musl`</sub> | <sub>`-Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -mno-shared -no-pie`</sub> | <sub>`-static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
-          | **ARMv7-A&nbsp;32-bit** | <sub>`armv7-unknown-linux-musleabihf`</sub> | <sub>`-Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-ident -fno-stack-protector -fomit-frame-pointer`</sub> | <sub>`-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
-          | **ARM64&nbsp;/&nbsp;AArch64** | <sub>`aarch64-unknown-linux-musl`</sub> | <sub>`-Os -march=armv8-a -fno-ident -fno-stack-protector -fomit-frame-pointer`</sub> | <sub>`-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
-          | **x86_64** | <sub>`x86_64-unknown-linux-musl`</sub> | <sub>`-Os -march=x86-64 -fno-ident -fno-stack-protector -fomit-frame-pointer`</sub> | <sub>`-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
-          | **i686&nbsp;32-bit** | <sub>`i686-unknown-linux-musl`</sub> | <sub>`-Os -march=i686 -fno-ident -fno-stack-protector -fomit-frame-pointer`</sub> | <sub>`-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
+          | **MIPS&nbsp;Big-Endian** | <sub>`mips-unknown-linux-musl`</sub> | <sub>`-Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -mno-shared -no-pie`</sub> | <sub>`-static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
+          | **MIPSEL&nbsp;Little-Endian** | <sub>`mipsel-unknown-linux-musl`</sub> | <sub>`-Os -march=24kc -mtune=24kc -mno-branch-likely -msoft-float -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -mno-shared -no-pie`</sub> | <sub>`-static -no-pie -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
+          | **ARMv7-A&nbsp;32-bit** | <sub>`armv7-unknown-linux-musleabihf`</sub> | <sub>`-Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables`</sub> | <sub>`-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
+          | **ARM64&nbsp;/&nbsp;AArch64** | <sub>`aarch64-unknown-linux-musl`</sub> | <sub>`-Os -march=armv8-a -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables`</sub> | <sub>`-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
+          | **x86_64** | <sub>`x86_64-unknown-linux-musl`</sub> | <sub>`-Os -march=x86-64 -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables`</sub> | <sub>`-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
+          | **i686&nbsp;32-bit** | <sub>`i686-unknown-linux-musl`</sub> | <sub>`-Os -march=i686 -fno-ident -fno-stack-protector -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables`</sub> | <sub>`-static -Wl,--gc-sections -lpthread -lrt -lgcc -Wl,--build-id=none -Wl,-z,norelro -Wl,-O2 -Wl,--exclude-libs,ALL`</sub> | musl&nbsp;1.2.5 | GNU&nbsp;ld |
 
           All targets compiled with Rust Nightly (`-Zbuild-std=std,panic_abort -Zbuild-std-features=optimize_for_size`).
           Each distribution ZIP contains `build_info.txt` with exact compilation flags, tools, and md5 checksums.
