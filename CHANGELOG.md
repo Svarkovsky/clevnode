@@ -26,10 +26,12 @@ All notable changes to this project will be documented in this file.
 - **System Resource Footprint:** Reduced constant system threads from 5-6 down to exactly 3 (C main thread, C NomadNet worker, and single Tokio worker). Virtual address space (`VmSize`) dropped from 33.2 MB to 19.8 - 25.0 MB, and memory peak spike (`VmPeak`) dropped from 47.8 MB to ~27.5 MB (saving >20 MB of peak RAM under full 24/7 load with 5,000 destinations and 18k packet dedup hashes).
 
 ### Binary Size & Dead-Weight Dependency Pruning
+- **Unwind Tables (.eh_frame) Stripping:** Added `-fno-unwind-tables` and `-fno-asynchronous-unwind-tables` to `CFLAGS`, as well as `-C force-unwind-tables=no -C embed-bitcode=no` to `RUSTFLAGS` across all target architectures in CI workflows and packaging scripts. Completely eliminates ~280 KB of non-strippable allocatable `.eh_frame` exception structures from static binaries.
+- **Binary Footprint:** Reduced final stripped executable size from 2.74 MB down to ~2.43 MB (saving over 310 KB of dead unwind data while keeping Curve25519 loop unrolling active).
 - **Regex Engine Elimination:** Removed `features = ["env-filter"]` from workspace `tracing-subscriber`, completely eliminating `matchers`, `regex-automata`, and `regex-syntax` (~280 KB of compiled code). Migrated `event_log.rs` to static `LevelFilter`.
 - **Unused Interface Module Isolation:** Isolated unconditional declarations of `kiss`, `pipe`, `rnode`, and `serial` in `interfaces/mod.rs` and `driver/mod.rs` with lightweight compile-time stubs, cutting over 5,800 lines of dead code and dropping tasks like `rnode_reconnect_task` (22.4 KB).
 - **JSON Parser Isolation:** Made `serde_json` strictly optional by gating `remote_status.rs` behind `cli`/`rpc` feature flags.
-- **Binary Footprint:** Reduced final stripped executable size from 2.55 MB down to ~2.43 MB (OPTION 2: 2,432,596 bytes), saving 114.5 KB despite unrolling Curve25519 loops.
+
 
 ### Storage & Memory Lifecycle
 - **Elimination of Disk Recombine on Flush:** Removed legacy on-disk database merging (`kd_store.load_all()`) in `flush_off_lock` (`storage.rs`). The memory snapshot is written directly and atomically to persistent storage, preventing expired or deleted identities from being revived from disk and aligning with reference Python Reticulum behavior where disk recombining on persist is deprecated.
