@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/platform-MIPS%20|%20ARM%20|%20x86-orange?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/RAM-3.7_MB_start_/_18.5_--_22.0_MB_load-brightgreen?style=flat-square" alt="RAM">
   <img src="https://img.shields.io/badge/binary-2.43_MB-blue?style=flat-square" alt="Binary">
-  <img src="https://img.shields.io/badge/uptime-50+_hours_continuous-brightgreen?style=flat-square" alt="Uptime">
+  <img src="https://img.shields.io/badge/uptime-950+_hours_continuous-brightgreen?style=flat-square" alt="Uptime">
 </p>
 
 ---
