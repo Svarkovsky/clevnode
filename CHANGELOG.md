@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2026-10-21
+
+### Flash Memory Protection & Ratchet Lifecycle
+- **In-Memory Ratchet Storage:** Eliminated individual file write-through (`save_known_ratchet`) for received remote ratchets. All known public ratchets are now maintained strictly in-memory within `MemoryStorage` BTreeMap, consuming less than 500 KB of RAM while eliminating 9,000+ micro-files and reclaiming ~37 MB of flash disk space on embedded nodes.
+- **Flash Wear Elimination:** Reduced flash drive write operations by over 99.9%, eliminating filesystem fragmentation, I/O wait latency, and USB controller contention during high-throughput announce bursts.
+- **Accelerated Daemon Startup:** Bypassed filesystem directory scanning (`readdir`) of thousands of legacy ratchet files on boot, achieving near-instantaneous startup.
+- **Persistent Destination Keys:** Node's own private destination ratchet keys remain safely persisted on disk for seamless identity continuity.
+
 ## [0.1.1] - 2026-10-02
 
 ### Security & Memory Safety

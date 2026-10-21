@@ -3,7 +3,7 @@ set -e
 
 BINARY="${1:?Binary path required}"
 ARCH="${2:?Architecture name required}"
-VERSION="${3:-v0.1.1}"
+VERSION="${3:-v0.1.2}"
 OUT_DIR="${4:-Releases}"
 CFLAGS_INFO="${5:-Not specified}"
 LDFLAGS_INFO="${6:-Not specified}"

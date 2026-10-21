@@ -189,18 +189,9 @@ impl Storage {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
 
-        // Load ratchets via store (capped to MAX_LOADED_RATCHETS newest)
         let mut ratchet_store = FileRatchetStore::new(&base_path);
-        if let Ok(mut ratchets) = ratchet_store.load_known_ratchets() {
-            if ratchets.len() > MAX_LOADED_RATCHETS {
-                ratchets.sort_unstable_by(|a, b| (b.1.received_at_secs as u64).cmp(&(a.1.received_at_secs as u64)));
-                ratchets.truncate(MAX_LOADED_RATCHETS);
-            }
-            for (dest_hash, entry) in ratchets {
-                let mono_ms = wallclock_secs_to_mono_ms(entry.received_at_secs, mono_offset_ms);
-                inner.remember_known_ratchet(dest_hash, entry.ratchet, mono_ms);
-            }
-        }
+        // Known ratchets are kept in-memory only to protect flash storage from wearing.
+        // We do not load legacy individual ratchet files from disk.
         if let Ok(keys) = ratchet_store.load_dest_ratchet_keys() {
             for (dest_hash, data) in keys {
                 CoreStorage::store_dest_ratchet_keys(&mut inner, dest_hash, data);
@@ -902,15 +893,8 @@ impl leviculum_core::traits::Storage for Storage {
         self.inner
             .remember_known_ratchet(dest_hash, ratchet, received_at_ms);
 
-        // Write-through to disk via ratchet store
-        let received_secs = mono_to_wallclock_secs(received_at_ms, self.mono_offset_ms);
-        let entry = leviculum_core::ratchet_store::KnownRatchetEntry {
-            ratchet,
-            received_at_secs: received_secs,
-        };
-        if let Err(e) = self.ratchet_store.save_known_ratchet(&dest_hash, &entry) {
-            tracing::warn!("Failed to persist known ratchet: {e}");
-        }
+        // In-memory only: known ratchets live in MemoryStorage BTreeMap (< 500 KB RAM)
+        // to protect flash storage from thousands of micro-writes.
     }
     fn expire_known_ratchets(&mut self, now_ms: u64, expiry_ms: u64) -> usize {
         // Collect hashes that will be expired (before memory expiry removes them)
@@ -1608,23 +1592,20 @@ mod tests {
     }
 
     #[test]
-    fn test_known_ratchet_persists_to_disk() {
-        let (mut storage, path) = unique_temp_storage("kr_persist");
+    fn test_known_ratchet_is_in_memory_only() {
+        let (mut storage, path) = unique_temp_storage("kr_in_mem");
 
         let hash = [0x11; TRUNCATED_HASHBYTES];
         let ratchet = [0xaa; 32];
         CoreStorage::remember_known_ratchet(&mut storage, hash, ratchet, 5000);
 
-        // Verify file exists
+        // Verify ratchet is available in memory
+        assert_eq!(CoreStorage::get_known_ratchet(&storage, &hash), Some(ratchet));
+
+        // Verify NO file is written to flash disk
         let hex = hex_encode(&hash);
         let file_path = path.join(RATCHETS_DIR).join(&hex);
-        assert!(file_path.exists(), "Ratchet file should exist on disk");
-
-        // Drop and recreate from same directory
-        drop(storage);
-        let storage2 = Storage::new(&path).unwrap();
-        let loaded = CoreStorage::get_known_ratchet(&storage2, &hash);
-        assert_eq!(loaded, Some(ratchet), "Ratchet should survive restart");
+        assert!(!file_path.exists(), "Known ratchets must live in-memory only and not write files to disk");
 
         // Cleanup
         let _ = std::fs::remove_dir_all(&path);
@@ -1664,25 +1645,15 @@ mod tests {
         CoreStorage::remember_known_ratchet(&mut storage, h1, ratchet, 1000);
         CoreStorage::remember_known_ratchet(&mut storage, h2, ratchet, 5000);
 
-        // Both files should exist
-        let hex1 = hex_encode(&h1);
-        let hex2 = hex_encode(&h2);
-        assert!(path.join(RATCHETS_DIR).join(&hex1).exists());
-        assert!(path.join(RATCHETS_DIR).join(&hex2).exists());
+        // Verify available in memory
+        assert_eq!(CoreStorage::get_known_ratchet(&storage, &h1), Some(ratchet));
+        assert_eq!(CoreStorage::get_known_ratchet(&storage, &h2), Some(ratchet));
 
         // Expire: h1 is 4000ms old at now=5000, threshold=3000
         let removed = CoreStorage::expire_known_ratchets(&mut storage, 5000, 3000);
         assert_eq!(removed, 1);
-
-        // h1 file should be deleted, h2 should remain
-        assert!(
-            !path.join(RATCHETS_DIR).join(&hex1).exists(),
-            "Expired ratchet file should be deleted"
-        );
-        assert!(
-            path.join(RATCHETS_DIR).join(&hex2).exists(),
-            "Non-expired ratchet file should remain"
-        );
+        assert_eq!(CoreStorage::get_known_ratchet(&storage, &h1), None);
+        assert_eq!(CoreStorage::get_known_ratchet(&storage, &h2), Some(ratchet));
 
         // Cleanup
         let _ = std::fs::remove_dir_all(&path);
@@ -1698,15 +1669,17 @@ mod tests {
         let hex = hex_encode(&[0x33; TRUNCATED_HASHBYTES]);
         std::fs::write(ratchets_dir.join(&hex), b"garbage data").unwrap();
 
-        // Recreate storage, should load without panic, skip corrupted file
+        // Recreate storage, should initialize cleanly and never load legacy files
         let storage = Storage::new(&path).unwrap();
         let loaded = CoreStorage::get_known_ratchet(&storage, &[0x33; TRUNCATED_HASHBYTES]);
         assert!(loaded.is_none(), "Corrupted ratchet should not be loaded");
 
-        // Corrupted file should be deleted
+        // Verify FileRatchetStore cleans corrupted file if manually loaded
+        let mut rstore = FileRatchetStore::new(&path);
+        let _ = rstore.load_known_ratchets();
         assert!(
             !ratchets_dir.join(&hex).exists(),
-            "Corrupted file should be deleted"
+            "Corrupted file should be deleted by FileRatchetStore"
         );
 
         // Cleanup

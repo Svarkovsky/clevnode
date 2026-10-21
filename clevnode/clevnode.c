@@ -1,6 +1,6 @@
 /*
  * clevnode: Monolithic C Node and NomadNet Page Server for Reticulum
- * Version 0.1.1
+ * Version 0.1.2
  *
  * A lightweight C implementation of a monolithic Reticulum node
  * and NomadNet page server based on the Leviculum C API by Lew Palm.
@@ -704,7 +704,7 @@ int main(int argc, char **argv) {
         return 0;
     }
     if (argc > 1 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0)) {
-        printf("clevnode v0.1.1\n");
+        printf("clevnode v0.1.2\n");
         return 0;
     }
 
@@ -723,7 +723,7 @@ int main(int argc, char **argv) {
     if (argc > 3) identity_file = argv[3];
 
     printf("[clevnode] ===================================================\n");
-    printf("[clevnode] clevnode v0.1.1 (Reticulum Node & NomadNet Server)\n");
+    printf("[clevnode] clevnode v0.1.2 (Reticulum Node & NomadNet Server)\n");
     printf("[clevnode] Author: Ivan Svarkovsky <ivansvarkovsky@gmail.com>\n");
     printf("[clevnode] Engine: Leviculum C-API by Lew Palm <lp@lew-palm.de>\n");
     printf("[clevnode] License: GNU AGPLv3+\n");

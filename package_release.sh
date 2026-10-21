@@ -5,7 +5,7 @@
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
-VERSION="${1:-v0.1.1}"
+VERSION="${1:-v0.1.2}"
 ARCH="mips-ath79-bigendian"
 
 echo "========================================================================"

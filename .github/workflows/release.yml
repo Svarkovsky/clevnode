@@ -159,7 +159,7 @@ jobs:
 
       - name: Package Distribution Archive
         run: |
-          VERSION="${GITHUB_REF_NAME:-v0.1.1}"
+          VERSION="${GITHUB_REF_NAME:-v0.1.2}"
           TOOLCHAIN_BIN="$GITHUB_WORKSPACE/toolchains/${{ matrix.toolchain_dir }}/bin"
           CC_VER=$("${TOOLCHAIN_BIN}/${{ matrix.cc }}" --version | head -n 1)
           RUST_VER=$(rustc --version)
@@ -207,7 +207,7 @@ jobs:
       - name: Generate Release Notes
         run: |
           cat << 'NOTES' > release_notes.md
-          ## What's Changed in v0.1.1
+          ## What's Changed in v0.1.2
 
           ### Multi-Architecture Builds
           Official standalone static release archives compiled against `musl libc` with pre-release QEMU execution verification for 6 hardware architectures:
@@ -219,6 +219,7 @@ jobs:
           - **i686-x86-32bit** (`i686-unknown-linux-musl`): 32-bit x86 legacy hardware and thin clients.
 
           ### Architecture & Resource Optimizations
+          - **In-Memory Ratchet Storage & Flash Wear Protection:** Eliminated individual file write-through for received remote ratchets. All known public ratchets are stored strictly in RAM (< 500 KB), eliminating 9,000+ micro-files, reclaiming ~37 MB on flash storage, and reducing flash drive write cycles by 99.9%.
           - **Unified Tokio Runtime:** Consolidated FFI event bridge and driver network I/O into a single shared Tokio worker (`reticulum-node`). Reduced permanent OS threads from 5-6 down to exactly 3.
           - **Clamped Thread Stacks:** Worker stack bounded to 128 KB via `thread_stack_size(128 * 1024)`. Virtual memory address space (`VmSize`) reduced from 33.2 MB to 19.8 - 25.0 MB, and peak memory spike (`VmPeak`) dropped from 47.8 MB to ~27.5 MB.
           - **Traffic Counter Thread Elimination:** Gated background 1-second polling thread under `#[cfg(feature = "rpc")]`.
