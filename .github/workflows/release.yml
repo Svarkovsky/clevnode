@@ -244,6 +244,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: clevnode v0.1.1
+          name: clevnode ${{ github.ref_name }}
           body_path: release_notes.md
           files: release_assets/*
