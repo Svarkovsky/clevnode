@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Protocol Parity & Hop Limit Wire Cutoff
+- **Outbound Hop Limit Enforcement (PATHFINDER_M = 128):** Aligned packet egress and forwarding conditions in `leviculum-core/src/transport.rs` with the reference Reticulum wire specification. In Reticulum, valid on-wire hop values are strictly 0 to 127 (`PATHFINDER_M = 128`), and any wire packet with `hops >= 128` triggers an immediate `ValueError: Invalid hop count 128` on Python nodes (`Packet.py:250`).
+- **Forwarding and Rebroadcast Cutoff:** Changed the forward drop threshold from `> self.config.max_hops` to `>= self.config.max_hops` across `forward_on_interface_from`, `forward_on_all_except`, `forward_on_all`, and `broadcast_announce_with_caps`. Packets that reach 128 hops upon receipt increment are preserved in the local path table as reachable at boundary distance, but are discarded on air retransmission under `DropReason::ForwardMaxHops` and never emitted onto the wire.
+- **Scheduler & Discovery Path Response Guards:** Updated `poll_announces` to immediately drop targeted path responses when `hops >= 128`, and retire boundary entries from the retransmit table (`remove_announce`). Added matching wire guards in `send_discovery_path_response` and `handle_path_request` before packet serialization.
+- **Regression Verification:** Added comprehensive test assertions verifying that boundary announces (`wire hops = 127 -> stored hops = 128`) are retained in the path table but cleanly dropped upon scheduled retransmission without generating wire actions. All test suites (`test_announce_at_max_hops_boundary_stored_and_rebroadcast`, `test_announce_over_max_hops_not_stored_or_rebroadcast`, `test_hop_limit_forward_drops_at_max`) pass with zero drops or panics. Confirmed 0 packets with `hops >= 128` in live telemetry over 350+ captured frames.
+
+### Build Automation & x86_64 Optimization
+- **Automated x86_64 Static Build Script:** Added `build_x86_64.sh` for one-step reproducible compilation of static `x86_64-unknown-linux-musl` binaries on Linux hosts.
+- **Unwind Tables (.eh_frame) Stripping for amd64:** Explicitly set `RUSTFLAGS="-C force-unwind-tables=no -C embed-bitcode=no"` for x86_64 builds. Eliminates DWARF `.eh_frame` and `.eh_frame_hdr` table bloat that standard GNU `strip` cannot remove from static executables, shrinking the stripped x86_64 binary from 2.24 MB down to 1.77 MB (saving over 440 KB).
+
 ## [0.1.2] - 2026-10-21
 
 ### Flash Memory Protection & Ratchet Lifecycle

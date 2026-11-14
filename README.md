@@ -311,7 +311,9 @@ Reticulum builds path tables reactively via cryptographically signed announces. 
 
 ---
 
-### 11. Build Instructions (`build_mips_be.sh`)
+### 11. Build Instructions
+
+#### MIPS Big-Endian Routers (`build_mips_be.sh`)
 
 ```bash
 # Install prerequisites on Ubuntu/Debian x86_64 host
@@ -330,6 +332,21 @@ rustup component add rust-src --toolchain nightly
 # Complete clean build
 ./build_mips_be.sh --clean
 ```
+
+#### x86_64 Linux Servers / VPS (`build_x86_64.sh`)
+
+Fully automated static build for 64-bit Linux servers and VPS (`x86_64-unknown-linux-musl`):
+
+```bash
+# Automated x86_64 build
+./build_x86_64.sh
+
+# Clean and rebuild
+./build_x86_64.sh --clean
+```
+
+> [!IMPORTANT]
+> **Size Optimization Note:** When building the Rust library manually via `cargo`, `RUSTFLAGS="-C force-unwind-tables=no -C embed-bitcode=no"` must always be passed. Without `-C force-unwind-tables=no`, `rustc` generates DWARF `.eh_frame` unwind tables for every function, which GNU `strip` cannot remove, inflating the static binary size by over 440 KB (2.24 MB vs 1.77 MB). Both `build_x86_64.sh` and `build_mips_be.sh` apply these flags automatically.
 
 ---
 
@@ -692,7 +709,9 @@ Reticulum спілкується з I2P через SAM API (порт `7656`). П
 
 ---
 
-### 11. Складання проєкту (`build_mips_be.sh`)
+### 11. Складання проєкту
+
+#### Роутери MIPS Big-Endian (`build_mips_be.sh`)
 
 ```bash
 # Встановлення вимог на хості Ubuntu/Debian x86_64
@@ -711,6 +730,21 @@ rustup component add rust-src --toolchain nightly
 # Повне очищення та збирання з нуля
 ./build_mips_be.sh --clean
 ```
+
+#### Сервери та VPS x86_64 Linux (`build_x86_64.sh`)
+
+Повністю автоматизоване статичне збирання для 64-бітних серверів Linux та VPS (`x86_64-unknown-linux-musl`):
+
+```bash
+# Автоматизоване збирання для x86_64
+./build_x86_64.sh
+
+# Очищення та повна перезбірка
+./build_x86_64.sh --clean
+```
+
+> [!IMPORTANT]
+> **Оптимізація розміру бінарника:** При ручному збиранні Rust-бібліотеки через `cargo` обов'язково передавайте прапорці `RUSTFLAGS="-C force-unwind-tables=no -C embed-bitcode=no"`. Без прапорця `-C force-unwind-tables=no` компілятор `rustc` генерує DWARF-таблиці розкрутки стека `.eh_frame` для кожної функції, які утиліта GNU `strip` не може видалити, що збільшує розмір бінарника більш ніж на 440 КБ (2.24 МБ проти 1.77 МБ). Скрипти `build_x86_64.sh` та `build_mips_be.sh` застосовують ці прапорці автоматично.
 
 ---
 
@@ -1080,7 +1114,9 @@ Reticulum взаимодействует с I2P через SAM API (порт `76
 
 ---
 
-### 11. Сборка проекта (`build_mips_be.sh`) и флаги компилятора
+### 11. Сборка проекта и флаги компилятора
+
+#### Роутеры MIPS Big-Endian (`build_mips_be.sh`)
 
 Сборка полностью автоматизирована скриптом `build_mips_be.sh` на хосте **Linux x86_64**.
 
@@ -1101,6 +1137,21 @@ rustup component add rust-src --toolchain nightly
 # Полная зачистка и пересборка с нуля
 ./build_mips_be.sh --clean
 ```
+
+#### Серверы и VPS x86_64 Linux (`build_x86_64.sh`)
+
+Полностью автоматизированная статическая сборка для 64-битных серверов Linux и VPS (`x86_64-unknown-linux-musl`):
+
+```bash
+# Автоматизированная сборка для x86_64
+./build_x86_64.sh
+
+# Полная зачистка и пересборка
+./build_x86_64.sh --clean
+```
+
+> [!IMPORTANT]
+> **Оптимизация размера бинарника:** При ручной компиляции библиотеки Rust через `cargo` обязательно передавайте флаги `RUSTFLAGS="-C force-unwind-tables=no -C embed-bitcode=no"`. Без флага `-C force-unwind-tables=no` компилятор `rustc` генерирует DWARF-таблицы раскрутки стека `.eh_frame` для каждой функции, которые стандартный GNU `strip` не вырезает, раздувая размер статичного бинарника более чем на 440 КБ (2.24 МБ против 1.77 МБ). Скрипты `build_x86_64.sh` и `build_mips_be.sh` применяют эти флаги автоматически.
 
 ---
 

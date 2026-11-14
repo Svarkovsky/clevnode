@@ -6608,7 +6608,7 @@ impl<C: Clock, S: Storage> Transport<C, S> {
         ph: [u8; PKT_PH_BYTES],
         peer: Option<[u8; TRUNCATED_HASHBYTES]>,
     ) -> Result<(), TransportError> {
-        if packet.hops > self.config.max_hops {
+        if packet.hops >= self.config.max_hops {
             crate::tracing::debug!(
                 "Dropped packet on {}, max hops exceeded (hops={}, max={})",
                 self.iface_name(target_iface),
@@ -6661,7 +6661,7 @@ impl<C: Clock, S: Storage> Transport<C, S> {
         packet: &mut Packet,
         full_hash: [u8; 32],
     ) {
-        if packet.hops > self.config.max_hops {
+        if packet.hops >= self.config.max_hops {
             crate::tracing::debug!(
                 hops = packet.hops,
                 max_hops = self.config.max_hops,
@@ -6709,7 +6709,7 @@ impl<C: Clock, S: Storage> Transport<C, S> {
     /// Self-heard echoes are dropped on arrival by the packet_hashlist dedup
     /// in process_incoming, seeded here before the broadcast is emitted.
     fn forward_on_all(&mut self, packet: &mut Packet) {
-        if packet.hops > self.config.max_hops {
+        if packet.hops >= self.config.max_hops {
             crate::tracing::debug!(
                 hops = packet.hops,
                 max_hops = self.config.max_hops,
@@ -8518,6 +8518,10 @@ impl<C: Clock, S: Storage> Transport<C, S> {
                 // transport_id and pass our filter (Transport.py:1192-1194).
                 if let Ok(mut announce) = Packet::unpack(&cached_raw) {
                     announce.hops = announce.hops.saturating_add(1);
+                    if announce.hops >= self.config.max_hops {
+                        self.stats.record_drop(DropReason::ForwardMaxHops);
+                        return Ok(());
+                    }
                     announce.flags.header_type = HeaderType::Type2;
                     announce.flags.transport_type = TransportType::Transport;
                     announce.transport_id = Some(*self.identity.hash());
@@ -9268,6 +9272,10 @@ impl<C: Clock, S: Storage> Transport<C, S> {
                 };
 
                 if let Some(target_iface) = target {
+                    if parsed.hops >= self.config.max_hops {
+                        self.stats.record_drop(DropReason::ForwardMaxHops);
+                        continue;
+                    }
                     // Path response: send only to the requesting interface
                     let size = parsed.packed_size();
                     let mut buf = alloc::vec![0u8; size];
@@ -9327,7 +9335,7 @@ impl<C: Clock, S: Storage> Transport<C, S> {
                 }
 
                 // If TTL exceeded, remove from announce table
-                if parsed.hops > self.config.max_hops {
+                if parsed.hops >= self.config.max_hops {
                     self.storage.remove_announce(&dest_hash);
                     // Codeberg #170: consume the held slot here too (see the
                     // to_remove loop above for why this beats the
@@ -9389,7 +9397,7 @@ impl<C: Clock, S: Storage> Transport<C, S> {
     /// Capped interfaces that already got a SendPacket may also receive the Broadcast;
     /// the driver should deduplicate if this matters for the link type.
     fn broadcast_announce_with_caps(&mut self, packet: &mut Packet) {
-        if packet.hops > self.config.max_hops {
+        if packet.hops >= self.config.max_hops {
             self.stats.record_drop(DropReason::ForwardMaxHops);
             return;
         }
@@ -9809,6 +9817,13 @@ impl<C: Clock, S: Storage> Transport<C, S> {
 
         if now >= timeout {
             // Expired, clean up
+            self.storage.remove_discovery_path_request(dest_hash);
+            self.peer_link_reoriginations.remove(dest_hash);
+            return;
+        }
+
+        if hops >= self.config.max_hops {
+            self.stats.record_drop(DropReason::ForwardMaxHops);
             self.storage.remove_discovery_path_request(dest_hash);
             self.peer_link_reoriginations.remove(dest_hash);
             return;
@@ -18584,6 +18599,30 @@ mod tests {
             assert!(
                 entry.retransmit_at_ms.is_some(),
                 "boundary announce (hops=128) must have a retransmit scheduled"
+            );
+
+            // Outbound wire guard: when the retry fires, hops=128 must NEVER be
+            // transmitted on air (RNS Python peers reject wire hops >= 128 with
+            // ValueError). It must be dropped as ForwardMaxHops.
+            transport
+                .clock
+                .advance(transport.announce_jitter_max_ms() + 100);
+            transport.poll();
+            let actions = transport.drain_actions();
+            assert!(
+                !actions
+                    .iter()
+                    .any(|a| matches!(a, Action::SendPacket { .. } | Action::Broadcast { .. })),
+                "announce at max hops (128) must NOT be emitted on the wire"
+            );
+            assert_eq!(
+                transport.stats().drops_forward_max_hops(),
+                1,
+                "the outbound drop must be accounted as forward-max-hops"
+            );
+            assert!(
+                transport.storage().get_announce(&dest_hash).is_none(),
+                "announce at max hops must be retired from the announce table"
             );
         }
 
