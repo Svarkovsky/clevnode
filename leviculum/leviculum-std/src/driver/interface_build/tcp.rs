@@ -125,6 +125,8 @@ pub(super) fn build_server(
             build_announce_rate_config(config).as_ref(),
             ctx.transport_enabled,
         ),
+        bitrate: config.bitrate.map(|b| b.min(u32::MAX as u64) as u32),
+        announce_cap: crate::driver::announce_cap_percent_from_config(config),
     })?;
     Ok(Built::SelfManaged)
 }

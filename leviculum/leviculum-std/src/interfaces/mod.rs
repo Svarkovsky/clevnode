@@ -652,6 +652,9 @@ pub(crate) struct InterfaceInfo {
     /// (`LocalClientInterface.should_ingress_limit() -> False`,
     /// LocalInterface.py:137-138).
     pub ingress_control: Option<bool>,
+    /// Configured announce cap share in percent (1..=100), inherited from
+    /// listener or configured explicitly.
+    pub announce_cap: Option<u32>,
 }
 
 /// Event loop's handle to a spawned interface task
@@ -871,6 +874,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: inc_rx,
             outgoing: out_tx,

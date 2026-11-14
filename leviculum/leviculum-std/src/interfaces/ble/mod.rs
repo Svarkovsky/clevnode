@@ -168,6 +168,7 @@ pub(crate) fn spawn_ble_interface(
         mode: InterfaceMode::default(),
         kind: InterfaceKind::Ble,
         ingress_control: None,
+        announce_cap: None,
     };
 
     let task = BleTask {

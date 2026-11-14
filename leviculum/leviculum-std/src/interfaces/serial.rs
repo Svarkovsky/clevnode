@@ -291,6 +291,7 @@ pub(crate) fn spawn_serial_interface(config: SerialInterfaceConfig) -> Interface
             mode: leviculum_core::traits::InterfaceMode::default(),
             kind: leviculum_core::traits::InterfaceKind::Serial,
             ingress_control: None,
+            announce_cap: None,
         },
         incoming: incoming_rx,
         outgoing: outgoing_tx,

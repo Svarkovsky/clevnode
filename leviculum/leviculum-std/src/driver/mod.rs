@@ -594,7 +594,7 @@ fn build_announce_rate_config(
 /// value that would round down to zero resolves to 1% — the smallest share the
 /// cap can express — because 0 would mean "no announces at all", which is not
 /// what a sub-1% cap asks for.
-fn announce_cap_percent_from_config(config: &InterfaceConfig) -> Option<u32> {
+pub(crate) fn announce_cap_percent_from_config(config: &InterfaceConfig) -> Option<u32> {
     config
         .announce_cap
         .map(|cap| (cap.round().max(1.0) as u32).min(100))
@@ -704,6 +704,36 @@ fn apply_bitrate_and_announce_cap(core: &mut StdNodeCore, idx: usize, config: &I
                  configured bitrate to take a share of",
                 idx
             );
+        }
+    }
+}
+
+/// Register a dynamically accepted interface with the core.
+///
+/// Inherits name, MTU, local client flag, mode, kind, ingress control, and IFAC.
+pub(crate) fn register_dynamic_interface(
+    core: &mut StdNodeCore,
+    info: &crate::interfaces::InterfaceInfo,
+) {
+    let iface_idx = info.id.0;
+    core.set_interface_name(iface_idx, info.name.clone());
+    if let Some(hw_mtu) = info.hw_mtu {
+        core.set_interface_hw_mtu(iface_idx, hw_mtu);
+    }
+    if info.is_local_client {
+        core.set_interface_local_client(iface_idx, true);
+    }
+    core.set_interface_mode(iface_idx, info.mode);
+    core.set_interface_kind(iface_idx, info.kind);
+    let ingress_on = info.ingress_control.unwrap_or(false);
+    core.set_interface_ingress_control(iface_idx, ingress_on);
+    if let Some(ifac) = &info.ifac {
+        core.set_ifac_config(iface_idx, ifac.clone());
+    }
+    if let Some(bitrate) = info.bitrate {
+        core.register_interface_bitrate(iface_idx, bitrate);
+        if let Some(cap) = info.announce_cap {
+            core.set_interface_announce_cap(iface_idx, cap);
         }
     }
 }
@@ -4219,50 +4249,12 @@ async fn run_event_loop(
                     continue;
                 }
                 tracing::info!("New connection: {} ({})", handle.info.name, handle.info.id);
-                let is_local = handle.info.is_local_client;
                 let iface_idx = handle.info.id.0;
+                let is_local = handle.info.is_local_client;
                 let inherited_ifac = handle.info.ifac.clone();
-                let inherited_mode = handle.info.mode;
-                let inherited_kind = handle.info.kind;
-                let inherited_ingress = handle.info.ingress_control;
                 {
                     let mut core = inner.lock_recover();
-                    core.set_interface_name(iface_idx, handle.info.name.clone());
-                    if let Some(hw_mtu) = handle.info.hw_mtu {
-                        core.set_interface_hw_mtu(iface_idx, hw_mtu);
-                    }
-                    if is_local {
-                        core.set_interface_local_client(iface_idx, true);
-                    }
-                    // Codeberg #104: apply the mode inherited from the parent
-                    // listener (e.g. a TCP server in AP/roaming mode) so the
-                    // spawned-per-connection interface carries the server's mode
-                    // and the inbound-side propagation rules apply to this peer.
-                    core.set_interface_mode(iface_idx, inherited_mode);
-                    core.set_interface_kind(iface_idx, inherited_kind);
-                    // Ingress control (Codeberg #8, reshaped in #189): a
-                    // dynamically-spawned interface inherits its listener's
-                    // configured value, mirroring `spawned_interface
-                    // .ingress_control = self.ingress_control`
-                    // (TCPInterface.py:582, I2PInterface.py:951,
-                    // BackboneInterface.py:409). #8 forced `false` here instead,
-                    // which threw away the operator's `ingress_control` on every
-                    // accepted connection — a larger claim than "this medium
-                    // does not need it", and the reason a TCP server never
-                    // limited an ingress burst at all.
-                    //
-                    // `None` means no listener declared a value. Every spawner
-                    // in the tree declares one today (TCP accept, I2P accept and
-                    // peer, local IPC accept), so this is the fallback for a
-                    // future one; off is the safe reading, and it is what the
-                    // local IPC path asks for explicitly anyway.
-                    let ingress_on = inherited_ingress.unwrap_or(false);
-                    core.set_interface_ingress_control(iface_idx, ingress_on);
-                    // Inherit IFAC config from parent interface (e.g., TCP server listener).
-                    // Removal path: handle_interface_down removes ifac_config when connection drops.
-                    if let Some(ifac) = &inherited_ifac {
-                        core.set_ifac_config(iface_idx, ifac.clone());
-                    }
+                    register_dynamic_interface(&mut core, &handle.info);
                 }
                 // Mirror inherited IFAC in driver-local ifac_configs for dispatch_actions.
                 if let Some(ifac) = inherited_ifac {
@@ -5591,6 +5583,7 @@ mod tests {
                     mode: leviculum_core::traits::InterfaceMode::default(),
                     kind: leviculum_core::traits::InterfaceKind::Udp,
                     ingress_control: None,
+                    announce_cap: None,
                 },
                 incoming: inc_rx,
                 outgoing: out_tx,
@@ -6159,6 +6152,37 @@ mod tests {
         );
     }
 
+    /// A dynamically accepted interface (e.g. child connection on a TCP server)
+    /// must inherit the listener's configured bitrate and announce_cap so that
+    /// egress announces on child connections are properly paced rather than
+    /// bypassing the rate limiter.
+    #[test]
+    fn dynamic_interface_inherits_bitrate_and_announce_cap() {
+        use crate::interfaces::InterfaceInfo;
+        let mut core = test_core("dynamic_cap");
+        let info = InterfaceInfo {
+            id: InterfaceId(42),
+            name: "tcp_server/127.0.0.1:54321".to_string(),
+            hw_mtu: Some(16384),
+            is_local_client: false,
+            bitrate: Some(130_000),
+            tx_jitter_max_ms: None,
+            ifac: None,
+            mode: leviculum_core::traits::InterfaceMode::Full,
+            kind: leviculum_core::traits::InterfaceKind::Tcp,
+            ingress_control: Some(false),
+            announce_cap: Some(5),
+        };
+
+        register_dynamic_interface(&mut core, &info);
+
+        assert_eq!(
+            core.interface_announce_cap(42),
+            Some(5),
+            "dynamic interface must have its announce_cap registered in core"
+        );
+    }
+
     /// Default builder leaves the event channel enabled. The first
     /// `take_event_receiver()` returns the receiver; second call returns
     /// `None` (already taken).
@@ -6303,6 +6327,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: inc_rx,
             outgoing: out_tx,
@@ -6834,6 +6859,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: inc_rx,
             outgoing: out_tx,
@@ -6885,6 +6911,7 @@ mod tests {
                     mode: leviculum_core::traits::InterfaceMode::default(),
                     kind: leviculum_core::traits::InterfaceKind::Unknown,
                     ingress_control: None,
+                    announce_cap: None,
                 },
                 incoming: inc_rx,
                 outgoing: out_tx,
@@ -6953,6 +6980,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: l_inc_rx,
             outgoing: l_out_tx,
@@ -6976,6 +7004,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: p_inc_rx,
             outgoing: p_out_tx,
@@ -7028,6 +7057,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: p_inc_rx,
             outgoing: p_out_tx,
@@ -7099,6 +7129,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: lora_inc_rx,
             outgoing: lora_out_tx,
@@ -7121,6 +7152,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: plain_inc_rx,
             outgoing: plain_out_tx,
@@ -7195,6 +7227,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: inc_rx,
             outgoing: out_tx,
@@ -7249,6 +7282,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: inc_rx,
             outgoing: out_tx,
@@ -7303,6 +7337,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: inc_rx,
             outgoing: out_tx,
@@ -7572,6 +7607,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: inc_rx,
             outgoing: out_tx,
@@ -8272,6 +8308,7 @@ mod tests {
                 mode: leviculum_core::traits::InterfaceMode::default(),
                 kind: leviculum_core::traits::InterfaceKind::Unknown,
                 ingress_control: None,
+                announce_cap: None,
             },
             incoming: in_rx,
             outgoing: out_tx,

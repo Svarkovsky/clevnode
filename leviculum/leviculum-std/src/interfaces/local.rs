@@ -360,6 +360,7 @@ fn spawn_local_interface_from_stream(
             // Stated here rather than left to a fallback so the local server
             // says what it means (Codeberg #189).
             ingress_control: Some(false),
+            announce_cap: None,
         },
         incoming: incoming_rx,
         outgoing: outgoing_tx,
@@ -446,6 +447,7 @@ pub(crate) fn spawn_local_client(
             mode: leviculum_core::traits::InterfaceMode::default(),
             kind: leviculum_core::traits::InterfaceKind::Local,
             ingress_control: None,
+            announce_cap: None,
         },
         incoming: incoming_rx,
         outgoing: outgoing_tx,

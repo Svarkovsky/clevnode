@@ -104,6 +104,7 @@ pub(crate) fn spawn_pipe_interface(mut config: PipeInterfaceConfig) -> Interface
             mode: leviculum_core::traits::InterfaceMode::default(),
             kind: leviculum_core::traits::InterfaceKind::Pipe,
             ingress_control: None,
+            announce_cap: None,
         },
         incoming: incoming_rx,
         outgoing: outgoing_tx,

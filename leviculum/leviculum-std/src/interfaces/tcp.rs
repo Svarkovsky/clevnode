@@ -274,6 +274,7 @@ pub(crate) fn spawn_tcp_interface_from_stream(
             mode: leviculum_core::traits::InterfaceMode::default(),
             kind: leviculum_core::traits::InterfaceKind::Tcp,
             ingress_control: None,
+            announce_cap: None,
         },
         incoming: incoming_rx,
         outgoing: outgoing_tx,
@@ -357,6 +358,10 @@ pub(crate) struct TcpServerConfig {
     pub inventory: SharedInventory,
     /// Resolved `announce_rate_target/penalty/grace` of the listener.
     pub announce_rate: (Option<u32>, Option<u32>, Option<u32>),
+    /// Configured bitrate of the listener, inherited by spawned children.
+    pub bitrate: Option<u32>,
+    /// Configured announce cap percentage of the listener, inherited by spawned children.
+    pub announce_cap: Option<u32>,
 }
 
 pub(crate) fn spawn_tcp_server(config: TcpServerConfig) -> Result<(), io::Error> {
@@ -373,6 +378,8 @@ pub(crate) fn spawn_tcp_server(config: TcpServerConfig) -> Result<(), io::Error>
         listener_id,
         inventory,
         announce_rate,
+        bitrate,
+        announce_cap,
     } = config;
 
     // Bind synchronously so errors propagate to the caller immediately
@@ -444,6 +451,8 @@ pub(crate) fn spawn_tcp_server(config: TcpServerConfig) -> Result<(), io::Error>
                             // which is the only entry a config file has for an
                             // accepted connection.
                             handle.info.ingress_control = Some(ingress_control);
+                            handle.info.bitrate = bitrate;
+                            handle.info.announce_cap = announce_cap;
                             tracing::info!("Accepted connection: {} ({})", name, id);
                             if new_interface_tx.send(handle).await.is_err() {
                                 break; // event loop shut down
@@ -525,6 +534,7 @@ pub(crate) fn spawn_tcp_client_with_reconnect(config: TcpClientConfig) -> Interf
             mode: leviculum_core::traits::InterfaceMode::default(),
             kind: leviculum_core::traits::InterfaceKind::Tcp,
             ingress_control: None,
+            announce_cap: None,
         },
         incoming: incoming_rx,
         outgoing: outgoing_tx,
@@ -1405,6 +1415,8 @@ mod tests {
             listener_id: 99,
             inventory: crate::interfaces::inventory::InterfaceInventory::shared(),
             announce_rate: (None, None, None),
+            bitrate: None,
+            announce_cap: None,
         })
         .unwrap();
 
@@ -1450,6 +1462,8 @@ mod tests {
             listener_id: 99,
             inventory: crate::interfaces::inventory::InterfaceInventory::shared(),
             announce_rate: (None, None, None),
+            bitrate: None,
+            announce_cap: None,
         })
         .unwrap();
 
@@ -1469,6 +1483,53 @@ mod tests {
             Interface::mode(&handle),
             InterfaceMode::AccessPoint,
             "the Interface::mode() trait accessor must report the inherited mode"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_tcp_server_spawned_child_inherits_bitrate_and_announce_cap() {
+        let next_id = Arc::new(AtomicUsize::new(0));
+        let (tx, mut rx) = mpsc::channel::<InterfaceHandle>(4);
+
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let std_listener = std::net::TcpListener::bind(addr).unwrap();
+        let bound_addr = std_listener.local_addr().unwrap();
+        drop(std_listener);
+
+        spawn_tcp_server(TcpServerConfig {
+            bind_addr: bound_addr,
+            section: "Capped Server".to_string(),
+            next_id: next_id.clone(),
+            new_interface_tx: tx,
+            buffer_size: 16,
+            corrupt_every: None,
+            ifac: None,
+            mode: leviculum_core::traits::InterfaceMode::default(),
+            ingress_control: false,
+            listener_id: 99,
+            inventory: crate::interfaces::inventory::InterfaceInventory::shared(),
+            announce_rate: (None, None, None),
+            bitrate: Some(130_000),
+            announce_cap: Some(5),
+        })
+        .unwrap();
+
+        let _client = tokio::net::TcpStream::connect(bound_addr).await.unwrap();
+
+        let handle = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .expect("timeout waiting for handle")
+            .expect("channel closed");
+
+        assert_eq!(
+            handle.info.bitrate,
+            Some(130_000),
+            "spawned child must inherit listener bitrate"
+        );
+        assert_eq!(
+            handle.info.announce_cap,
+            Some(5),
+            "spawned child must inherit listener announce_cap"
         );
     }
 
@@ -1502,6 +1563,8 @@ mod tests {
                 listener_id: 99,
                 inventory: crate::interfaces::inventory::InterfaceInventory::shared(),
                 announce_rate: (None, None, None),
+                bitrate: None,
+                announce_cap: None,
             })
             .unwrap();
 
