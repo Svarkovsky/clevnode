@@ -15522,7 +15522,7 @@ mod tests {
         }
 
         #[test]
-        fn test_announce_cap_queue_deduplicates_by_destination() {
+        fn test_announce_cap_queue_deduplicates_by_emission_timestamp() {
             let mut transport = make_transport_enabled();
             let iface = transport.register_interface(Box::new(MockInterface::new("if0", 1)));
             transport.set_interface_name(iface, "if0".into());
