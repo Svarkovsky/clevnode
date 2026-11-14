@@ -572,6 +572,8 @@ pub(crate) struct QueuedAnnounce {
     pub dst: [u8; TRUNCATED_HASHBYTES],
     /// Hop count (lower = higher priority for dequeue)
     pub hops: u8,
+    /// Emission timestamp extracted from random_hash (Python Transport.py:1777-1788)
+    pub emitted: u64,
     /// When this announce was queued (ms)
     pub queued_at_ms: u64,
 }
@@ -9454,12 +9456,16 @@ impl<C: Clock, S: Storage> Transport<C, S> {
                 ann_tx_ifaces.push(*iface_idx);
             } else {
                 // Check if already queued for this destination (Python Transport.py:1766-1785)
+                let emission_timestamp = ReceivedAnnounce::from_packet(packet)
+                    .map(|ann| emission_from_random_hash(ann.random_hash()))
+                    .unwrap_or(0);
                 let mut already_queued = false;
                 for existing in &mut cap.queue {
                     if existing.dst == packet.destination_hash {
                         already_queued = true;
-                        if packet.hops < existing.hops {
+                        if emission_timestamp > existing.emitted {
                             existing.hops = packet.hops;
+                            existing.emitted = emission_timestamp;
                             existing.raw = raw.clone();
                             existing.queued_at_ms = now;
                         }
@@ -9473,6 +9479,7 @@ impl<C: Clock, S: Storage> Transport<C, S> {
                             raw: raw.clone(),
                             dst: packet.destination_hash,
                             hops: packet.hops,
+                            emitted: emission_timestamp,
                             queued_at_ms: now,
                         });
                         ann_suppressed.push((*iface_idx, "airtime_cap"));
@@ -15225,6 +15232,7 @@ mod tests {
                 raw: alloc::vec![0xAA; 100],
                 dst: [0u8; TRUNCATED_HASHBYTES],
                 hops: 2,
+                emitted: 0,
                 queued_at_ms: transport.clock.now_ms(),
             });
 
@@ -15435,6 +15443,7 @@ mod tests {
                     raw: alloc::vec![i as u8; 50],
                     dst: [0u8; TRUNCATED_HASHBYTES],
                     hops: 1,
+                    emitted: 0,
                     queued_at_ms: transport.clock.now_ms() + i as u64,
                 });
             }
@@ -15448,6 +15457,7 @@ mod tests {
                     raw: alloc::vec![0xFF; 50],
                     dst: [0u8; TRUNCATED_HASHBYTES],
                     hops: 1,
+                    emitted: 0,
                     queued_at_ms: transport.clock.now_ms(),
                 });
             }
@@ -15456,6 +15466,59 @@ mod tests {
                 max_queued,
                 "queue should not grow beyond max"
             );
+        }
+
+        fn make_announce_raw_dest_emitted(
+            dest: &Destination,
+            hops: u8,
+            emitted: u64,
+        ) -> Vec<u8> {
+            use crate::packet::{HeaderType, PacketData, PacketFlags, TransportType};
+            let mut random_hash = [0u8; crate::constants::RANDOM_HASHBYTES];
+            random_hash[0..5].copy_from_slice(&[1, 2, 3, 4, 5]);
+            random_hash[5] = (emitted >> 32) as u8;
+            random_hash[6] = (emitted >> 24) as u8;
+            random_hash[7] = (emitted >> 16) as u8;
+            random_hash[8] = (emitted >> 8) as u8;
+            random_hash[9] = emitted as u8;
+
+            let id = dest.identity().unwrap();
+            let mut payload = Vec::new();
+            payload.extend_from_slice(&id.public_key_bytes());
+            payload.extend_from_slice(dest.name_hash());
+            payload.extend_from_slice(&random_hash);
+
+            let app_data = b"test";
+            let mut signed_data = Vec::new();
+            signed_data.extend_from_slice(dest.hash().as_bytes());
+            signed_data.extend_from_slice(&id.public_key_bytes());
+            signed_data.extend_from_slice(dest.name_hash());
+            signed_data.extend_from_slice(&random_hash);
+            signed_data.extend_from_slice(app_data);
+
+            let signature = id.sign(&signed_data).unwrap();
+            payload.extend_from_slice(&signature);
+            payload.extend_from_slice(app_data);
+
+            let packet = Packet {
+                flags: PacketFlags {
+                    ifac_flag: false,
+                    header_type: HeaderType::Type1,
+                    context_flag: false,
+                    transport_type: TransportType::Broadcast,
+                    dest_type: DestinationType::Single,
+                    packet_type: PacketType::Announce,
+                },
+                hops,
+                transport_id: None,
+                destination_hash: *dest.hash().as_bytes(),
+                context: PacketContext::None,
+                data: PacketData::Owned(payload),
+            };
+
+            let mut buf = [0u8; 500];
+            let len = packet.pack(&mut buf).unwrap();
+            buf[..len].to_vec()
         }
 
         #[test]
@@ -15469,37 +15532,42 @@ mod tests {
             let cap = transport.interface_announce_caps.get_mut(&iface).unwrap();
             cap.allowed_at_ms = transport.clock.now_ms() + 1_000_000;
 
-            let (raw_a, _dest_a) = make_announce_raw(3, PacketContext::None);
-            let mut packet_a3 = Packet::unpack(&raw_a).unwrap();
-            packet_a3.hops = 3;
+            let id_a = Identity::generate(&mut OsRng);
+            let dest_a = Destination::new(Some(id_a), crate::destination::Direction::In, DestinationType::Single, "app", &["aspect"]).unwrap();
 
-            // 1. Queue announce for Dest A with hops = 3
-            transport.broadcast_announce_with_caps(&mut packet_a3);
-            let cap = transport.interface_announce_caps.get(&iface).unwrap();
-            assert_eq!(cap.queue.len(), 1);
-            assert_eq!(cap.queue[0].dst, packet_a3.destination_hash);
-            assert_eq!(cap.queue[0].hops, 3);
-
-            // 2. Announce for Dest A arrives with worse hops = 4 -> deduplicated, hops remain 3
-            let mut packet_a4 = Packet::unpack(&raw_a).unwrap();
-            packet_a4.hops = 4;
-            transport.broadcast_announce_with_caps(&mut packet_a4);
-            let cap = transport.interface_announce_caps.get(&iface).unwrap();
-            assert_eq!(cap.queue.len(), 1, "Duplicate announce must not grow the queue");
-            assert_eq!(cap.queue[0].hops, 3, "Worse hops must not overwrite queued announce");
-
-            // 3. Announce for Dest A arrives with better hops = 1 -> replaces queued entry
-            let mut packet_a1 = Packet::unpack(&raw_a).unwrap();
-            packet_a1.hops = 1;
+            // 1. Queue announce for Dest A with emitted = 1000, hops = 3
+            let raw_a1 = make_announce_raw_dest_emitted(&dest_a, 3, 1000);
+            let mut packet_a1 = Packet::unpack(&raw_a1).unwrap();
             transport.broadcast_announce_with_caps(&mut packet_a1);
             let cap = transport.interface_announce_caps.get(&iface).unwrap();
-            assert_eq!(cap.queue.len(), 1, "Better-hop announce must replace, not grow queue");
-            assert_eq!(cap.queue[0].hops, 1, "Better-hop announce must update queued hops");
+            assert_eq!(cap.queue.len(), 1);
+            assert_eq!(cap.queue[0].dst, packet_a1.destination_hash);
+            assert_eq!(cap.queue[0].emitted, 1000);
+            assert_eq!(cap.queue[0].hops, 3);
+
+            // 2. Older announce arrives for Dest A (emitted = 500) -> deduplicated, entry keeps emitted=1000, hops=3
+            let raw_a_old = make_announce_raw_dest_emitted(&dest_a, 1, 500);
+            let mut packet_a_old = Packet::unpack(&raw_a_old).unwrap();
+            transport.broadcast_announce_with_caps(&mut packet_a_old);
+            let cap = transport.interface_announce_caps.get(&iface).unwrap();
+            assert_eq!(cap.queue.len(), 1, "Duplicate announce must not grow the queue");
+            assert_eq!(cap.queue[0].emitted, 1000, "Older announce must not overwrite queued entry");
+            assert_eq!(cap.queue[0].hops, 3);
+
+            // 3. Newer announce arrives for Dest A (emitted = 2000, hops = 2) -> replaces queued entry
+            let raw_a_new = make_announce_raw_dest_emitted(&dest_a, 2, 2000);
+            let mut packet_a_new = Packet::unpack(&raw_a_new).unwrap();
+            transport.broadcast_announce_with_caps(&mut packet_a_new);
+            let cap = transport.interface_announce_caps.get(&iface).unwrap();
+            assert_eq!(cap.queue.len(), 1, "Newer announce must replace, not grow queue");
+            assert_eq!(cap.queue[0].emitted, 2000, "Newer announce must update queued emitted");
+            assert_eq!(cap.queue[0].hops, 2, "Newer announce must update queued hops");
 
             // 4. Announce for Dest B (different destination) -> queued as 2nd entry
-            let (raw_b, _dest_b) = make_announce_raw(2, PacketContext::None);
+            let id_b = Identity::generate(&mut OsRng);
+            let dest_b = Destination::new(Some(id_b), crate::destination::Direction::In, DestinationType::Single, "app", &["b"]).unwrap();
+            let raw_b = make_announce_raw_dest_emitted(&dest_b, 2, 1000);
             let mut packet_b = Packet::unpack(&raw_b).unwrap();
-            packet_b.hops = 2;
             transport.broadcast_announce_with_caps(&mut packet_b);
             let cap = transport.interface_announce_caps.get(&iface).unwrap();
             assert_eq!(cap.queue.len(), 2, "Different destination must be queued");
@@ -15671,12 +15739,14 @@ mod tests {
                 raw: alloc::vec![0xAA; 50],
                 dst: [0u8; TRUNCATED_HASHBYTES],
                 hops: 3,
+                emitted: 0,
                 queued_at_ms: now,
             });
             cap.queue.push_back(QueuedAnnounce {
                 raw: alloc::vec![0xBB; 50],
                 dst: [0u8; TRUNCATED_HASHBYTES],
                 hops: 1,
+                emitted: 0,
                 queued_at_ms: now + 1,
             });
             cap.allowed_at_ms = now; // Allow immediate drain
@@ -15757,6 +15827,7 @@ mod tests {
                 raw: alloc::vec![0xAA; 50],
                 dst: [0u8; TRUNCATED_HASHBYTES],
                 hops: 1,
+                emitted: 0,
                 queued_at_ms: now,
             });
 
