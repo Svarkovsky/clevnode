@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Interface Discovery & RMAP Mapping
+- **Geographic Coordinates & Interface Discovery in Config:** Added support for `latitude`, `longitude`, `height` (and alias `altitude`), as well as `discovery_announce_interval` configuration keys in `ini_config.rs` and `InterfaceConfig` (`leviculum-std`).
+- **Wire Descriptor Population:** Forwarded coordinate parameters from interface configuration to `InterfaceDescriptor` in `descriptor_from_config`, enabling discoverable interfaces (`discoverable = yes`) to broadcast discovery announcements on `rnstransport.discovery.interface` containing standard Reticulum msgpack keys 0x03 (`latitude`), 0x04 (`longitude`), 0x05 (`height`), and valid 16-bit PoW stamps.
+- **Verification & Test Coverage:** Added unit test `test_parse_discovery_coordinates_and_rmap_fields` ensuring end-to-end config parsing, descriptor population, wire payload encoding, and decode round-trip. Verified via live network capture on wire traffic that outgoing discovery announces properly contain geographic coordinates and valid proof-of-work stamps.
+
 ### Protocol Parity & Hop Limit Wire Cutoff
 - **Outbound Hop Limit Enforcement (PATHFINDER_M = 128):** Aligned packet egress and forwarding conditions in `leviculum-core/src/transport.rs` with the reference Reticulum wire specification. In Reticulum, valid on-wire hop values are strictly 0 to 127 (`PATHFINDER_M = 128`), and any wire packet with `hops >= 128` triggers an immediate `ValueError: Invalid hop count 128` on Python nodes (`Packet.py:250`).
 - **Forwarding and Rebroadcast Cutoff:** Changed the forward drop threshold from `> self.config.max_hops` to `>= self.config.max_hops` across `forward_on_interface_from`, `forward_on_all_except`, `forward_on_all`, and `broadcast_announce_with_caps`. Packets that reach 128 hops upon receipt increment are preserved in the local path table as reachable at boundary distance, but are discarded on air retransmission under `DropReason::ForwardMaxHops` and never emitted onto the wire.

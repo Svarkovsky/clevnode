@@ -449,6 +449,18 @@ fn apply_interface_key(iface: &mut InterfaceConfig, key: &str, value: &str) {
         "discovery_encrypt" => iface.discovery_encrypt = parse_bool(value),
         "discovery_name" => iface.discovery_name = Some(value.to_string()),
         "reachable_on" => iface.reachable_on = Some(value.to_string()),
+        "latitude" => iface.latitude = value.parse().ok(),
+        "longitude" => iface.longitude = value.parse().ok(),
+        "height" | "altitude" => iface.height = value.parse().ok(),
+        "discovery_announce_interval" => {
+            if let Ok(v) = value.parse::<u64>() {
+                if v >= 300 {
+                    iface.discovery_announce_interval_secs = Some(v);
+                } else {
+                    iface.announce_interval = Some(v);
+                }
+            }
+        }
         // Python config key is `announce_interval` in MINUTES (as_int, *60 with a
         // 5-minute floor, Reticulum.py:852-854); the minutes->seconds conversion
         // and floor live in `resolve_announce_interval_secs`. Stored verbatim.
@@ -2693,5 +2705,74 @@ loglevel = 4
         assert_eq!(fast.discovery_announce_interval_secs, Some(5));
         assert_eq!(crate::discovery::resolve_announce_interval_secs(fast), 5);
         assert!(crate::discovery::descriptor_from_config(fast).is_some());
+    }
+
+    #[test]
+    fn test_parse_discovery_coordinates_and_rmap_fields() {
+        let config = parse_ini(
+            r#"
+[interfaces]
+  [[Zurich Hub]]
+    type = TCPServerInterface
+    listen_ip = 0.0.0.0
+    listen_port = 4242
+    discoverable = yes
+    discovery_name = Coral Node Zurich Hub
+    reachable_on = 132.226.219.103
+    latitude = 47.3769
+    longitude = 8.5417
+    height = 408.0
+    discovery_announce_interval = 21600
+"#,
+        )
+        .unwrap();
+
+        let hub = config.interfaces.get("Zurich Hub").expect("Zurich Hub iface");
+        assert!(hub.discoverable);
+        assert_eq!(hub.discovery_name, Some("Coral Node Zurich Hub".to_string()));
+        assert_eq!(hub.reachable_on, Some("132.226.219.103".to_string()));
+        assert_eq!(hub.latitude, Some(47.3769));
+        assert_eq!(hub.longitude, Some(8.5417));
+        assert_eq!(hub.height, Some(408.0));
+        assert_eq!(hub.discovery_announce_interval_secs, Some(21600));
+        assert_eq!(crate::discovery::resolve_announce_interval_secs(hub), 21600);
+
+        let desc = crate::discovery::descriptor_from_config(hub).expect("descriptor");
+        assert_eq!(desc.interface_type, "TCPServerInterface");
+        assert_eq!(desc.name, Some("Coral Node Zurich Hub".to_string()));
+        assert_eq!(desc.reachable_on, Some("132.226.219.103".to_string()));
+        assert_eq!(desc.port, Some(4242));
+        assert_eq!(desc.latitude, Some(47.3769));
+        assert_eq!(desc.longitude, Some(8.5417));
+        assert_eq!(desc.height, Some(408.0));
+
+        // Test wire encoding of discovery announce app_data:
+        // Must contain keys 0x03 (latitude), 0x04 (longitude), 0x05 (height).
+        let transport_id = [0x5au8; 16];
+        let mut rng = rand_core::OsRng;
+        let app_data = leviculum_core::discovery::build_announce_app_data(
+            &desc,
+            &transport_id,
+            true,
+            &mut rng,
+        )
+        .expect("build_announce_app_data");
+
+        // Parse back and verify fields are intact
+        let discovered = leviculum_core::discovery::parse_announce_app_data(
+            &app_data,
+            &transport_id,
+            leviculum_core::discovery::MIN_REQUIRED_STAMP_VALUE,
+        )
+        .expect("parse_announce_app_data");
+
+        assert_eq!(discovered.latitude, Some(47.3769));
+        assert_eq!(discovered.longitude, Some(8.5417));
+        assert_eq!(discovered.height, Some(408.0));
+        assert_eq!(discovered.name, "Coral Node Zurich Hub");
+        assert_eq!(discovered.reachable_on, Some("132.226.219.103".to_string()));
+        assert_eq!(discovered.port, Some(4242));
+        assert_eq!(discovered.transport, true);
+        assert!(discovered.value >= leviculum_core::discovery::DEFAULT_STAMP_VALUE);
     }
 }

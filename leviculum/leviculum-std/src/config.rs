@@ -286,6 +286,15 @@ pub struct InterfaceConfig {
     /// the announcer on a short cadence. Takes priority over `announce_interval`.
     #[serde(default)]
     pub discovery_announce_interval_secs: Option<u64>,
+    /// Geographical latitude in decimal degrees for interface discovery / RMAP.
+    #[serde(default)]
+    pub latitude: Option<f64>,
+    /// Geographical longitude in decimal degrees for interface discovery / RMAP.
+    #[serde(default)]
+    pub longitude: Option<f64>,
+    /// Height / altitude above mean sea level in meters for interface discovery / RMAP.
+    #[serde(default)]
+    pub height: Option<f64>,
 
     // TCP/UDP specific
     /// Kernel network interface name to bind to (Python `device`,
@@ -597,6 +606,9 @@ impl Default for InterfaceConfig {
             discovery_encrypt: false,
             announce_interval: None,
             discovery_announce_interval_secs: None,
+            latitude: None,
+            longitude: None,
+            height: None,
             device: None,
             prefer_ipv6: None,
             listen_ip: None,

@@ -65,6 +65,9 @@ pub(crate) fn descriptor_from_config(cfg: &InterfaceConfig) -> Option<InterfaceD
     let mut desc = InterfaceDescriptor {
         interface_type: cfg.interface_type.clone(),
         name: cfg.discovery_name.clone(),
+        latitude: cfg.latitude,
+        longitude: cfg.longitude,
+        height: cfg.height,
         ..Default::default()
     };
     match cfg.interface_type.as_str() {
