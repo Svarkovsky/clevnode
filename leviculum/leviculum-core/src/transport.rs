@@ -4707,14 +4707,10 @@ impl<C: Clock, S: Storage> Transport<C, S> {
         let random_hash = *announce.random_hash();
 
         // Random blob replay protection: reject if we've seen this exact random_hash,
-        // UNLESS:
-        // the path is unresponsive (path recovery), OR
-        // the announce has fewer hops than the existing path (better route)
-        // (Python Transport.py:1676-1681).
+        // UNLESS the path is unresponsive (path recovery, Python Transport.py:1677-1679).
         if let Some(path) = self.storage.get_path(&dest_hash) {
             if path.random_blobs.contains(&random_hash)
                 && !self.path_is_unresponsive(&dest_hash)
-                && packet.hops >= path.hops
             {
                 crate::tracing::trace!(
                     dest = %HexShort(&dest_hash),
@@ -4793,12 +4789,9 @@ impl<C: Clock, S: Storage> Transport<C, S> {
             let announce_emitted = emission_from_random_hash(&random_hash);
             let path_timebase = max_emission_from_blobs(&existing.random_blobs);
             if packet.hops <= existing.hops {
-                // Equal or fewer hops: accept if emission is newer, or if
-                // same emission but strictly fewer hops (same announce via
-                // a shorter path, e.g. direct vs relayed path response).
-                if announce_emitted > path_timebase
-                    || (announce_emitted == path_timebase && packet.hops < existing.hops)
-                {
+                // Equal or fewer hops: accept if emission is newer
+                // (Python Transport.py:1620-1625: `if not random_blob in random_blobs and announce_emitted > path_timebase`).
+                if announce_emitted > path_timebase {
                     self.mark_path_unknown_state(&dest_hash);
                     true
                 } else {
@@ -9459,17 +9452,37 @@ impl<C: Clock, S: Storage> Transport<C, S> {
                 let wait_ms = (tx_bits * 1000).checked_div(cap_bps).unwrap_or(0);
                 cap.allowed_at_ms = now + wait_ms;
                 ann_tx_ifaces.push(*iface_idx);
-            } else if cap.queue.len() < self.config.max_queued_announces {
-                cap.queue.push_back(QueuedAnnounce {
-                    raw: raw.clone(),
-                    dst: packet.destination_hash,
-                    hops: packet.hops,
-                    queued_at_ms: now,
-                });
-                ann_suppressed.push((*iface_idx, "airtime_cap"));
             } else {
-                // Queue full: the announce is dropped on this interface.
-                ann_suppressed.push((*iface_idx, "queue_full"));
+                // Check if already queued for this destination (Python Transport.py:1766-1785)
+                let mut already_queued = false;
+                for existing in &mut cap.queue {
+                    if existing.dst == packet.destination_hash {
+                        already_queued = true;
+                        if packet.hops < existing.hops {
+                            existing.hops = packet.hops;
+                            existing.raw = raw.clone();
+                            existing.queued_at_ms = now;
+                        }
+                        break;
+                    }
+                }
+
+                if !already_queued {
+                    if cap.queue.len() < self.config.max_queued_announces {
+                        cap.queue.push_back(QueuedAnnounce {
+                            raw: raw.clone(),
+                            dst: packet.destination_hash,
+                            hops: packet.hops,
+                            queued_at_ms: now,
+                        });
+                        ann_suppressed.push((*iface_idx, "airtime_cap"));
+                    } else {
+                        // Queue full: the announce is dropped on this interface.
+                        ann_suppressed.push((*iface_idx, "queue_full"));
+                    }
+                } else {
+                    ann_suppressed.push((*iface_idx, "airtime_cap"));
+                }
             }
         }
 
@@ -14535,7 +14548,7 @@ mod tests {
             assert_eq!(LINK_TIMEOUT_MS, 900_000);
             assert_eq!(PATH_REQUEST_GRACE_MS, 400);
             assert_eq!(crate::constants::PATH_REQUEST_TIMEOUT_MS, 15_000);
-            assert_eq!(MAX_PATH_REQUEST_TAGS, 32_000);
+            assert_eq!(MAX_PATH_REQUEST_TAGS, 8_000);
             assert_eq!(PATH_REQUEST_MIN_INTERVAL_MS, 20_000);
         }
 
@@ -14559,6 +14572,37 @@ mod tests {
                 transport.stats().announces_processed,
                 1,
                 "Replayed announce should be dropped"
+            );
+        }
+
+        #[test]
+        fn test_announce_replay_dropped_even_with_fewer_hops() {
+            let mut transport = make_transport_enabled();
+            let _idx0 = transport.register_interface(Box::new(MockInterface::new("if0", 1)));
+
+            let (raw, _dest_hash) = make_announce_raw(3, PacketContext::None);
+            transport.process_incoming(0, &raw).unwrap();
+            assert_eq!(transport.stats().announces_processed, 1);
+            assert_eq!(transport.stats().drops_announce_replay(), 0);
+
+            // Bypass packet cache and rate limit
+            transport.storage_mut().clear_packet_hashes();
+            transport.clock.advance(ANNOUNCE_RATE_LIMIT_MS + 1);
+
+            // Replay exact same announce (same random_hash) but with FEWER hops (hops = 1)
+            let mut raw_fewer_hops = raw.clone();
+            raw_fewer_hops[1] = 1; // hops = 1 < 3
+
+            transport.process_incoming(0, &raw_fewer_hops).unwrap();
+            assert_eq!(
+                transport.stats().drops_announce_replay(),
+                1,
+                "Replayed announce with fewer hops must still be dropped as AnnounceReplay"
+            );
+            assert_eq!(
+                transport.stats().announces_processed,
+                1,
+                "Replayed announce with fewer hops must not be processed"
             );
         }
 
@@ -15412,6 +15456,53 @@ mod tests {
                 max_queued,
                 "queue should not grow beyond max"
             );
+        }
+
+        #[test]
+        fn test_announce_cap_queue_deduplicates_by_destination() {
+            let mut transport = make_transport_enabled();
+            let iface = transport.register_interface(Box::new(MockInterface::new("if0", 1)));
+            transport.set_interface_name(iface, "if0".into());
+            transport.register_interface_bitrate(iface, 1200);
+
+            // Hold off sending so all announces are queued
+            let cap = transport.interface_announce_caps.get_mut(&iface).unwrap();
+            cap.allowed_at_ms = transport.clock.now_ms() + 1_000_000;
+
+            let (raw_a, _dest_a) = make_announce_raw(3, PacketContext::None);
+            let mut packet_a3 = Packet::unpack(&raw_a).unwrap();
+            packet_a3.hops = 3;
+
+            // 1. Queue announce for Dest A with hops = 3
+            transport.broadcast_announce_with_caps(&mut packet_a3);
+            let cap = transport.interface_announce_caps.get(&iface).unwrap();
+            assert_eq!(cap.queue.len(), 1);
+            assert_eq!(cap.queue[0].dst, packet_a3.destination_hash);
+            assert_eq!(cap.queue[0].hops, 3);
+
+            // 2. Announce for Dest A arrives with worse hops = 4 -> deduplicated, hops remain 3
+            let mut packet_a4 = Packet::unpack(&raw_a).unwrap();
+            packet_a4.hops = 4;
+            transport.broadcast_announce_with_caps(&mut packet_a4);
+            let cap = transport.interface_announce_caps.get(&iface).unwrap();
+            assert_eq!(cap.queue.len(), 1, "Duplicate announce must not grow the queue");
+            assert_eq!(cap.queue[0].hops, 3, "Worse hops must not overwrite queued announce");
+
+            // 3. Announce for Dest A arrives with better hops = 1 -> replaces queued entry
+            let mut packet_a1 = Packet::unpack(&raw_a).unwrap();
+            packet_a1.hops = 1;
+            transport.broadcast_announce_with_caps(&mut packet_a1);
+            let cap = transport.interface_announce_caps.get(&iface).unwrap();
+            assert_eq!(cap.queue.len(), 1, "Better-hop announce must replace, not grow queue");
+            assert_eq!(cap.queue[0].hops, 1, "Better-hop announce must update queued hops");
+
+            // 4. Announce for Dest B (different destination) -> queued as 2nd entry
+            let (raw_b, _dest_b) = make_announce_raw(2, PacketContext::None);
+            let mut packet_b = Packet::unpack(&raw_b).unwrap();
+            packet_b.hops = 2;
+            transport.broadcast_announce_with_caps(&mut packet_b);
+            let cap = transport.interface_announce_caps.get(&iface).unwrap();
+            assert_eq!(cap.queue.len(), 2, "Different destination must be queued");
         }
 
         #[test]
@@ -18187,11 +18278,12 @@ mod tests {
             .unwrap();
             let dest_hash = dest.hash().into_bytes();
 
-            // Use the same random_hash for both announces (same announce, different paths).
+            // A re-announce with newer emission (1001 > 1000) within the rate window (2000ms).
             // process_incoming increments hops by 1, so wire hops = stored hops - 1.
-            let random_hash = make_random_hash([0xAA; 5], 1000);
-            let raw_3hops = make_announce_raw_with_random_hash(&dest, 2, &random_hash); // stored as 3
-            let raw_2hops = make_announce_raw_with_random_hash(&dest, 1, &random_hash); // stored as 2
+            let random_hash1 = make_random_hash([0xAA; 5], 1000);
+            let random_hash2 = make_random_hash([0xAB; 5], 1001);
+            let raw_3hops = make_announce_raw_with_random_hash(&dest, 2, &random_hash1); // stored as 3
+            let raw_2hops = make_announce_raw_with_random_hash(&dest, 1, &random_hash2); // stored as 2
 
             // First: 3-hop announce arrives on if0 (long ring path)
             let _ = transport.process_incoming(0, &raw_3hops);
@@ -18237,9 +18329,10 @@ mod tests {
             let dest_hash = dest.hash().into_bytes();
 
             // process_incoming increments hops by 1, so wire hops = stored hops - 1.
-            let random_hash = make_random_hash([0xBB; 5], 2000);
-            let raw_3hops = make_announce_raw_with_random_hash(&dest, 2, &random_hash); // stored as 3
-            let raw_2hops = make_announce_raw_with_random_hash(&dest, 1, &random_hash); // stored as 2
+            let random_hash1 = make_random_hash([0xBB; 5], 2000);
+            let random_hash2 = make_random_hash([0xBC; 5], 2001);
+            let raw_3hops = make_announce_raw_with_random_hash(&dest, 2, &random_hash1); // stored as 3
+            let raw_2hops = make_announce_raw_with_random_hash(&dest, 1, &random_hash2); // stored as 2
 
             // 3-hop announce arrives — rebroadcast fires from the retry
             // scheduler once the jitter window elapses (Python parity).
@@ -20004,10 +20097,11 @@ mod tests {
 
         // Replay bypass for better hop count
         #[test]
-        fn test_replay_announce_accepted_when_fewer_hops() {
-            // Scenario: path request response arrives via relay (2 hops), then the
-            // direct announce from the source arrives (0 hops) with the same
-            // random_blob. The direct announce must NOT be rejected as replay.
+        fn test_replay_announce_rejected_even_when_fewer_hops() {
+            // Scenario: path request response arrives via relay (2 hops), then another
+            // packet with the same random_blob arrives with 0 hops.
+            // Python RNS parity (Transport.py:1620-1681): duplicate random_blob must be
+            // rejected as replay even if hop count is fewer, unless path is unresponsive.
             use crate::destination::{Destination, DestinationType, Direction};
 
             let mut transport = make_transport_enabled();
@@ -20056,16 +20150,16 @@ mod tests {
             transport.storage_mut().clear_packet_hashes(); // allow reprocessing
             transport.process_incoming(0, &buf[..len]).unwrap();
 
-            // Path must be updated to the better route
+            // Replay with same random_hash must be dropped as replay, path unchanged
             assert_eq!(
                 transport.hops_to(&dest_hash),
-                Some(1),
-                "Direct announce (wire=0 + receipt) must replace the 3-hop relayed path"
+                Some(3),
+                "Replayed announce with same random_blob must be dropped as replay, keeping 3-hop path"
             );
             assert_eq!(
-                transport.path(&dest_hash).unwrap().interface_index,
-                0,
-                "Path should now point to interface 0 (direct)"
+                transport.stats().drops_announce_replay(),
+                1,
+                "Replayed announce must be counted as AnnounceReplay drop"
             );
         }
 
