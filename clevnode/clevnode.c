@@ -45,6 +45,9 @@
 /** @brief Default file path for storing the destination identity keypair. */
 #define DEFAULT_IDENTITY_FILE "/tmp/mnt/sda1/home/lblogd/identities/lblogd"
 
+/** @brief Periodic node re-announcement interval in seconds (4 hours). */
+#define NODE_REANNOUNCE_INTERVAL 14400
+
 /** @brief Resolved configuration directory path. */
 static char resolved_config_dir[PATH_MAX];
 
@@ -872,7 +875,7 @@ int main(int argc, char **argv) {
 
     while (running) {
         time_t now = time(NULL);
-        if (now - last_announce >= 1800) {
+        if (now - last_announce >= NODE_REANNOUNCE_INTERVAL) {
             printf("[clevnode] Re-announcing as \"%s\"...\n", node_name);
             lev_announce(node, dest_hash, (const uint8_t *)node_name, strlen(node_name), 5000);
             last_announce = now;

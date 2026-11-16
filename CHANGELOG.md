@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Node Re-announcement Rate & RMAP Anti-Flood Compliance
+- **Stationary Node Re-announcement Interval (14 400 s / 4 h):** Increased default periodic destination re-announcement interval (`NODE_REANNOUNCE_INTERVAL`) in `clevnode.c` from 1 800 seconds (30 minutes) to 14 400 seconds (4 hours).
+- **RMAP Backbone & Network Hygiene Alignment:** In Reticulum mesh networks and public monitoring backbones (such as `rmap.world`), nodes emitting announces too frequently are flagged with excessive announce warnings (`> 6/h`, Red status) and risk automated blackholing or bans. For stationary transport nodes connected to multiple backbone peers, a 30-minute interval combined with routine path responses and transit latency bursts pushed the sliding-window announce rate into excessive territory (~6-7/h).
+- **Network Overhead Reduction:** Extending the interval to 4 hours lowers baseline destination announcements to ~0.25/h (safely in the green zone `< 3/h`), significantly reducing unnecessary bandwidth consumption across mesh links while preserving fresh path discovery and reliable reachability.
+
 ### Announce Traffic Shaping & Protocol Parity
 - **Python RNS Announce Replay Parity (Transport.py:2519):** Removed non-standard hops-based bypasses (`packet.hops >= path.hops` and `announce_emitted == path_timebase && hops <`) in `leviculum-core/src/transport.rs`. Responsive paths now unconditionally drop duplicate announce random blobs (`DropReason::AnnounceReplay`), matching Python Reticulum reference behavior (RNS 1.6.0 `Transport.py:2519`, master `Transport.py:2522`) and eliminating duplicate announce storms ("same packet, different hops" duplicates dropped to 0).
 - **Announce Queue Parity & Emission Timestamp Dedup (Transport.py:1777-1781):** Refactored `QueuedAnnounce` in `leviculum-core/src/transport.rs` to track the 40-bit big-endian `emission_timestamp` extracted from the announce packet's `random_hash`. When an announce for an already-queued destination arrives in `cap.queue`, the entry is replaced only if `emission_timestamp > existing.emitted` (strictly aligning with Python Reticulum `Transport.py:1777-1781` instead of comparing hop counts).
