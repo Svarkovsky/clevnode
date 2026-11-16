@@ -4265,37 +4265,21 @@ async fn run_event_loop(
                     stats.insert(iface_idx, Arc::clone(&handle.counters));
                 }
                 registry.register(handle);
-
-                // Send cached local-destination announces on the new interface
-                // so the new peer learns about our destinations even if the
-                // original announce was sent before the connection was established.
-                if !is_local {
-                    let output = {
-                        let mut core = inner.lock_recover();
-                        core.handle_interface_up(iface_idx)
-                    };
-                    tighten_next_poll(&mut next_poll, dispatch_output(output, &mut registry, event_sink.as_mut(), &inner, &mut retry_queues, &mut retry_queue_warned, &mut retry_queue_max_depth, &ifac_configs, remote_mgmt.as_ref(), discovery_storage.as_deref(), discovery_network_identity.as_deref(), &mut discovery_heard_ifac, &completions, core_processor.as_mut()));
-                }
             }
 
-            // Branch 6: TCP client reconnection (Block D)
+            // Branch 6: TCP client reconnection
             //
-            // When a reconnecting TCP client re-establishes its connection, it
-            // sends a notification here. We call handle_interface_up() to
-            // re-announce all local destinations (daemon-owned get fresh announces,
-            // client-cached get rebroadcast) so the remote peer re-learns paths.
+            // When a reconnecting TCP client re-establishes its connection,
+            // re-apply IFAC configuration to core if present.
+            // Following reference Python Reticulum parity, do not re-announce
+            // local destinations on reconnect to avoid flooding the mesh.
             Some(iface_id) = reconnect_rx.recv() => {
-                tracing::info!("Interface {} reconnected, re-announcing destinations", iface_id);
+                tracing::info!("Interface {} reconnected", iface_id);
                 // Re-apply IFAC config to core (E29: handle_interface_down removed it)
                 if let Some(cfg) = ifac_configs.get(&iface_id.0) {
                     let mut core = inner.lock_recover();
                     core.set_ifac_config(iface_id.0, cfg.clone());
                 }
-                let output = {
-                    let mut core = inner.lock_recover();
-                    core.handle_interface_up(iface_id.0)
-                };
-                tighten_next_poll(&mut next_poll, dispatch_output(output, &mut registry, event_sink.as_mut(), &inner, &mut retry_queues, &mut retry_queue_warned, &mut retry_queue_max_depth, &ifac_configs, remote_mgmt.as_ref(), discovery_storage.as_deref(), discovery_network_identity.as_deref(), &mut discovery_heard_ifac, &completions, core_processor.as_mut()));
             }
 
             // Branch 6c: Per-peer transitions on a multi-peer interface
